@@ -13,6 +13,12 @@ export type LocalUser = {
   id: string;
   firebaseUid: string;
   email: string;
+  /**
+   * Auto-generated public @-handle (e.g. "@hasan_42"). Assigned by the
+   * backend on first sign-in; may be null for legacy rows that haven't
+   * been refreshed via /api/auth/verify yet — UI should fall back to "—".
+   */
+  username: string | null;
   name: string | null;
   picture: string | null;
   provider: string | null;

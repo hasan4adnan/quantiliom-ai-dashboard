@@ -3,7 +3,7 @@ import type { Route } from "../lib/router";
 import { BellIcon, ChevronDownIcon, MenuIcon } from "./icons";
 
 type Props = {
-  user: { name: string; email: string; plan: string };
+  user: { name: string; email: string; plan: string; username: string | null };
   route: Route;
   onMenuClick: () => void;
   onNavigate: (r: Route) => void;
@@ -101,6 +101,9 @@ export default function Topbar({
             <div className="account-menu" role="menu">
               <div className="account-menu-head">
                 <div className="account-menu-name">{user.name}</div>
+                {user.username ? (
+                  <div className="account-menu-username">{user.username}</div>
+                ) : null}
                 {user.email ? (
                   <div className="account-menu-email">{user.email}</div>
                 ) : null}

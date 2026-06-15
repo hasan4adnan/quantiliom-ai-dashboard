@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import AuthGate from "./components/AuthGate";
+import PageTransition from "./components/PageTransition";
 import Sidebar from "./components/Sidebar";
 import Topbar from "./components/Topbar";
 import DashboardHome from "./pages/DashboardHome";
@@ -174,6 +175,7 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
             name: deriveDisplayName(fbUser, localUser),
             email,
             plan: planLabel(localUser.plan),
+            username: localUser.username,
           }}
           route={route}
           onMenuClick={() => setNavOpen(true)}
@@ -181,16 +183,18 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
           onSignOut={handleSignOut}
         />
         <div className="app-scroll">
-          <div className="app-scroll-inner" key={`${route}:${param ?? ""}`}>
-            {renderPage({
-              route,
-              param,
-              navigate,
-              email,
-              fbUser,
-              localUser,
-              onSignOut: handleSignOut,
-            })}
+          <div className="app-scroll-inner">
+            <PageTransition pageKey={`${route}:${param ?? ""}`}>
+              {renderPage({
+                route,
+                param,
+                navigate,
+                email,
+                fbUser,
+                localUser,
+                onSignOut: handleSignOut,
+              })}
+            </PageTransition>
           </div>
         </div>
       </main>

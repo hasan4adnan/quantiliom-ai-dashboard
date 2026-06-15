@@ -474,6 +474,14 @@
   letter-spacing: -0.005em;
 }
 
+.account-menu-username {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--accent);
+  margin-top: 3px;
+  word-break: break-all;
+}
+
 .account-menu-email {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -564,21 +572,134 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
- * Page transitions (between Home / Projects / Subscription / …)
+ * Page transition system — between Home / Projects / Subscription / …
+ *
+ * Layout: <PageTransition> renders one or two `.page-layer` siblings
+ * inside `.page-stage`. The incoming layer is `.is-entering` and lives
+ * in normal flow (so it sets the height of the scroll content). The
+ * outgoing layer is `.is-leaving`, absolutely positioned over the new
+ * page so the two animations play in parallel without fighting for
+ * layout.
+ *
+ * Motion: the wrapper layer drives the macro motion (slight lift, soft
+ * scale, gentle blur on enter). Each page's root carries `.page-enter`,
+ * which then staggers its direct children (`.hero`, `<section>`, etc.)
+ * so the page composes itself in a quick wave instead of arriving as a
+ * single rectangle. Single shared easing — `--ease-spring` — keeps the
+ * motion vocabulary identical to the rest of the UI.
  * ═════════════════════════════════════════════════════════════════════════ */
-@keyframes page-fade-up {
+
+.page-stage {
+  position: relative;
+  width: 100%;
+}
+
+.page-layer {
+  width: 100%;
+  /* GPU-promote opacity + transform so the transition stays off the
+   * main thread; cleared on animation end below to free the layer. */
+  will-change: opacity, transform, filter;
+  transform-origin: 50% 0;
+  backface-visibility: hidden;
+}
+
+.page-layer.is-entering {
+  animation: page-layer-in 460ms var(--ease-spring) both;
+}
+
+.page-layer.is-leaving {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  animation: page-layer-out 200ms var(--ease-in) both;
+}
+
+@keyframes page-layer-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translate3d(0, 10px, 0) scale(0.985);
+    filter: blur(3px);
+  }
+  55% {
+    filter: blur(0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
   }
 }
 
-.page-enter {
-  animation: page-fade-up 320ms var(--ease-spring) both;
+@keyframes page-layer-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.995);
+    filter: blur(1.5px);
+  }
+}
+
+/* `.page-enter` lives on each page's root <div>. Inside an outgoing
+ * layer we disable it so the snapshot doesn't restart its entrance just
+ * to be animated out — the leaving layer owns the exit motion. */
+.is-leaving .page-enter,
+.is-leaving .page-enter > * {
+  animation: none !important;
+  opacity: 1;
+  transform: none;
+  filter: none;
+}
+
+/* Direct-child stagger on the entering page. Each section lifts in
+ * shortly after the wrapper has settled; capped at child #5 so long
+ * pages don't end up with sections that animate in after the user has
+ * already started reading. */
+.is-entering .page-enter > * {
+  animation: page-section-in 520ms var(--ease-spring) both;
+  animation-delay: 110ms;
+}
+.is-entering .page-enter > :nth-child(2) { animation-delay: 160ms; }
+.is-entering .page-enter > :nth-child(3) { animation-delay: 210ms; }
+.is-entering .page-enter > :nth-child(4) { animation-delay: 250ms; }
+.is-entering .page-enter > :nth-child(n+5) { animation-delay: 290ms; }
+
+@keyframes page-section-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-layer.is-entering,
+  .page-layer.is-leaving,
+  .is-entering .page-enter > * {
+    animation-duration: 160ms !important;
+    animation-delay: 0ms !important;
+    animation-timing-function: ease !important;
+  }
+  @keyframes page-layer-in {
+    from { opacity: 0; transform: none; filter: none; }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+  @keyframes page-layer-out {
+    from { opacity: 1; transform: none; filter: none; }
+    to   { opacity: 0; transform: none; filter: none; }
+  }
+  @keyframes page-section-in {
+    from { opacity: 0; transform: none; }
+    to   { opacity: 1; transform: none; }
+  }
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
@@ -3466,6 +3587,15 @@
   letter-spacing: -0.015em;
   color: var(--text-primary);
   line-height: 1.1;
+}
+.account-profile-username {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: var(--weight-medium);
+  color: var(--accent);
+  letter-spacing: -0.005em;
+  word-break: break-all;
 }
 .account-profile-email {
   margin-top: 4px;

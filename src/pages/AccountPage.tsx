@@ -179,6 +179,9 @@ export default function AccountPage({ fbUser, localUser, onNavigate, onSignOut }
           </div>
           <div className="account-profile-info">
             <h3 className="account-profile-name">{displayName}</h3>
+            {localUser.username ? (
+              <p className="account-profile-username">{localUser.username}</p>
+            ) : null}
             <p className="account-profile-email">{email}</p>
             <div className="account-badges">
               <span className="account-badge">
@@ -272,6 +275,7 @@ export default function AccountPage({ fbUser, localUser, onNavigate, onSignOut }
         </header>
 
         <div className="account-detail-grid">
+          <Detail label="Username" value={dashIfEmpty(localUser.username)} mono />
           <Detail label="Email" value={dashIfEmpty(email)} mono />
           <Detail
             label="Email verified"
