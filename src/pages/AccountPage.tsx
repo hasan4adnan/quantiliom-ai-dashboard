@@ -279,8 +279,12 @@ export default function AccountPage({ fbUser, localUser, onNavigate, onSignOut }
           <Detail label="Email" value={dashIfEmpty(email)} mono />
           <Detail
             label="Email verified"
-            value={fbUser.emailVerified ? "Yes" : "No"}
-            iconYes={fbUser.emailVerified}
+            value={
+              localUser.emailVerifiedAt
+                ? `Yes · ${formatDate(localUser.emailVerifiedAt)}`
+                : "No"
+            }
+            iconYes={Boolean(localUser.emailVerifiedAt)}
           />
           <Detail label="Welcome email sent" value={formatDate(localUser.welcomeEmailSentAt)} />
         </div>

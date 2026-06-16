@@ -1339,3 +1339,223 @@
     font-size: 14px;
   }
 }
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * EMAIL VERIFICATION — 6-digit code input
+ *
+ * Used by src/components/EmailVerificationScreen.tsx. Reuses the right
+ * panel chrome (.r-panel / .r-form-wrap / .submit-btn / .auth-toast) so
+ * this screen matches LoginScreen visually. The .vc-* classes layer on
+ * top to widen the form, center its contents, and add the OTP-specific
+ * digit-row + resend block. The digit row uses flex (not grid) on
+ * purpose — CSS grid items default to min-width:auto which prevents
+ * <input> elements from shrinking below their browser-default width
+ * (~80px), causing the row to overflow the form-wrap.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.vc-form-wrap {
+  max-width: 440px;
+  text-align: center;
+}
+
+.vc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: rgba(239, 111, 46, 0.1);
+  color: var(--accent);
+  margin-bottom: 22px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.6) inset,
+    0 6px 16px rgba(239, 111, 46, 0.18);
+}
+
+.vc-heading {
+  margin-bottom: 10px;
+}
+
+.vc-subhead {
+  margin-bottom: 28px;
+  line-height: 1.55;
+}
+
+.vc-email {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  color: var(--color-factory-black);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  display: inline-block;
+  margin-top: 4px;
+  padding: 3px 10px;
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.vc-toast {
+  margin-bottom: 18px;
+  text-align: left;
+}
+
+/* The digit row. Flex (not grid) so each box can be a fixed 44×56,
+ * tightly packed, with a subtle "###-###" rhythm. */
+.vc-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 4px 0 24px;
+}
+
+.vc-box {
+  width: 46px;
+  height: 56px;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--color-factory-black);
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  outline: none;
+  caret-color: var(--accent);
+  transition:
+    border-color 0.15s var(--ease-out),
+    box-shadow 0.15s var(--ease-out),
+    background-color 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
+  -moz-appearance: textfield;
+}
+.vc-box::-webkit-outer-spin-button,
+.vc-box::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.vc-box:hover:not(:disabled):not(:focus) {
+  border-color: var(--gray-500);
+}
+
+.vc-box:focus {
+  border-color: var(--accent);
+  box-shadow:
+    0 0 0 4px rgba(239, 111, 46, 0.16),
+    0 2px 6px rgba(239, 111, 46, 0.12);
+  transform: translateY(-1px);
+}
+
+.vc-box.is-filled {
+  background: var(--gray-50);
+  border-color: var(--color-factory-black);
+}
+
+.vc-box:disabled {
+  background: var(--gray-50);
+  color: var(--gray-400);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* Subtle dash between digit 3 and 4 — gives the row an OTP cadence
+ * without making it look like two separate fields. */
+.vc-sep {
+  display: inline-block;
+  width: 8px;
+  height: 2px;
+  background: var(--gray-300);
+  border-radius: 1px;
+  margin: 0 2px;
+}
+
+.vc-submit {
+  margin-top: 4px;
+}
+
+.vc-foot {
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vc-resend-row {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-500);
+}
+
+.vc-resend-label {
+  color: var(--gray-500);
+}
+
+.vc-resend-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 500;
+  color: var(--color-factory-black);
+  cursor: pointer;
+  border-bottom: 1px solid var(--gray-300);
+  padding-bottom: 1px;
+  transition: color 0.15s var(--ease-out), border-color 0.15s var(--ease-out);
+}
+
+.vc-resend-btn:hover:not(:disabled) {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.vc-resend-btn:disabled {
+  cursor: not-allowed;
+  color: var(--gray-400);
+  border-color: transparent;
+}
+
+.vc-help {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--gray-400);
+  margin: 0;
+}
+
+@media (max-width: 540px) {
+  .vc-row {
+    gap: 6px;
+  }
+  .vc-box {
+    width: 40px;
+    height: 50px;
+    font-size: 22px;
+    border-radius: 7px;
+  }
+  .vc-sep {
+    width: 6px;
+    margin: 0 1px;
+  }
+  .vc-badge {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 380px) {
+  .vc-box {
+    width: 36px;
+    height: 46px;
+    font-size: 20px;
+  }
+}

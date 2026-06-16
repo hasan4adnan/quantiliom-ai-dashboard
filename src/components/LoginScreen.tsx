@@ -354,7 +354,7 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
   );
 }
 
-function LeftPanel() {
+export function LeftPanel() {
   return (
     <div className="l-panel" aria-hidden="false">
       <div className="l-body">
