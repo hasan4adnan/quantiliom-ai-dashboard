@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   GithubAuthProvider,
   GoogleAuthProvider,
+  OAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
 } from "../lib/firebase";
@@ -38,6 +39,7 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
   const [info, setInfo] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
   const [githubBusy, setGithubBusy] = useState(false);
+  const [microsoftBusy, setMicrosoftBusy] = useState(false);
   const emailRef = useRef<HTMLInputElement | null>(null);
 
   // Sync mode <-> URL hash so the website can deep-link to /#signup.
@@ -139,10 +141,62 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
     } catch (err) {
       const code = errorCode(err);
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        setError(friendlyAuthError(err));
+        setError(friendlyAuthError(err, "GitHub"));
       }
     } finally {
       setGithubBusy(false);
+    }
+  }
+
+  async function handleMicrosoft() {
+    if (microsoftBusy || !auth) return;
+    clearFlash();
+    setMicrosoftBusy(true);
+    try {
+      // Firebase doesn't ship a dedicated MicrosoftAuthProvider — the
+      // generic OAuthProvider with the "microsoft.com" id is the
+      // documented integration.
+      //
+      // tenant:"consumers" restricts this flow to personal Microsoft
+      // accounts (Outlook / Hotmail / Live / Xbox / Gmail-backed
+      // MSAs). The matching Azure App Registration must be on
+      // "Personal Microsoft accounts only" — that combination avoids
+      // the multitenant "publisher verification required" policy that
+      // would otherwise silently close the popup after consent.
+      //
+      // To re-enable work/school (Entra ID) accounts too, the long
+      // term move is to verify the publisher in Azure (MPN ID) and
+      // switch back to tenant:"common" + "any tenant + personal" in
+      // Azure. Until then, work accounts go through Google/GitHub.
+      //
+      // prompt:"select_account" forces the account picker every time
+      // instead of silently reusing a cached browser session — much
+      // less confusing during sign-up since the user sees exactly
+      // which account is being used.
+      //
+      // We don't .addScope("email") / .addScope("profile") — those are
+      // OpenID scopes (not Microsoft Graph scopes) and Firebase
+      // already includes them by default. Adding them again can
+      // confuse Microsoft into rejecting the request.
+      const provider = new OAuthProvider("microsoft.com");
+      provider.setCustomParameters({
+        tenant: "consumers",
+        prompt: "select_account",
+      });
+      await signInWithPopup(auth, provider);
+    } catch (err) {
+      // Microsoft popups have a known failure mode where the popup
+      // closes after consent without completing the token exchange —
+      // Firebase surfaces this as `auth/popup-closed-by-user` even
+      // though the user didn't actually close it. So unlike the
+      // Google/GitHub handlers we DON'T swallow it silently here;
+      // staying mute would leave the user thinking nothing happened.
+      console.error("[auth] Microsoft sign-in failed:", err);
+      const code = errorCode(err);
+      if (code === "auth/cancelled-popup-request") return; // double-click; harmless
+      setError(microsoftAuthError(err));
+    } finally {
+      setMicrosoftBusy(false);
     }
   }
 
@@ -224,10 +278,11 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
             <button
               type="button"
               className="social-btn"
-              onClick={() => setError("Microsoft Sign-In is not configured yet.")}
+              onClick={handleMicrosoft}
+              disabled={microsoftBusy}
             >
               <MicrosoftLogo />
-              Microsoft
+              {microsoftBusy ? "Connecting…" : "Microsoft"}
             </button>
             <button
               type="button"
@@ -475,7 +530,44 @@ function errorCode(err: unknown): string {
   return "";
 }
 
-function friendlyAuthError(err: unknown): string {
+/**
+ * Microsoft-specific error mapping. Differs from friendlyAuthError in
+ * one key way: we DON'T treat auth/popup-closed-by-user as a no-op.
+ * Microsoft's OAuth flow can close the popup after consent without
+ * completing the token exchange (most commonly when the Azure App
+ * Registration's supportedAccountTypes doesn't match the user's
+ * account type, or when the Redirect URI in Azure doesn't exactly
+ * match the one Firebase shows). Firebase reports that as
+ * popup-closed-by-user — so we surface it with actionable advice.
+ */
+function microsoftAuthError(err: unknown): string {
+  const code = errorCode(err);
+  if (code === "auth/popup-closed-by-user") {
+    return (
+      "The Microsoft sign-in window closed before sign-in completed. " +
+      "If this keeps happening, check that your Azure App Registration " +
+      "allows both personal and work accounts, and that its Redirect URI " +
+      "exactly matches the one Firebase shows."
+    );
+  }
+  if (code === "auth/popup-blocked") {
+    return "Popup blocked by the browser. Please allow popups and retry.";
+  }
+  if (code === "auth/account-exists-with-different-credential") {
+    return "An account with this email already exists, but with a different sign-in method. Use the original method to sign in.";
+  }
+  if (code === "auth/operation-not-allowed") {
+    return "Microsoft sign-in isn't enabled for this Firebase project yet.";
+  }
+  if (code === "auth/internal-error") {
+    return "Microsoft sign-in failed inside Firebase. Check the browser console for details and try again.";
+  }
+  // Fall through to the generic mapper so we still catch network /
+  // no-email-claim / etc. cases.
+  return friendlyAuthError(err, "Microsoft");
+}
+
+function friendlyAuthError(err: unknown, providerLabel?: string): string {
   const code = errorCode(err);
   const map: Record<string, string> = {
     "auth/email-already-in-use": "This email is already registered. Please sign in instead.",
@@ -488,22 +580,25 @@ function friendlyAuthError(err: unknown): string {
     "auth/too-many-requests": "Too many attempts. Please try again later.",
     "auth/network-request-failed": "Network error. Check your connection.",
     "auth/popup-blocked": "Popup blocked by the browser. Please allow popups and retry.",
-    // GitHub (and any OAuth provider) — Firebase throws this when the
-    // same email is already registered against a different provider.
-    // Most common path: user signed up with Google, then later clicks
-    // GitHub with an account that resolves to the same address.
+    // Any OAuth provider — Firebase throws this when the same email is
+    // already registered against a different provider. Common path:
+    // user signed up with Google, then later clicks GitHub/Microsoft
+    // with an account that resolves to the same address.
     "auth/account-exists-with-different-credential":
       "An account with this email already exists, but with a different sign-in method. Use the original method to sign in.",
   };
   if (map[code]) return map[code];
 
-  // GitHub-specific: the user's GitHub account has no verified email.
-  // Our backend rejects tokens without an email claim, so surface that
-  // as actionable advice instead of the raw backend error.
+  // OAuth providers can return a token without an email claim if the
+  // user's account has no verified email exposed (GitHub private email
+  // without user:email scope, Microsoft personal account with no
+  // primary email, etc.). Our backend rejects those tokens — surface
+  // that as actionable advice rather than the raw backend error.
   if (err && typeof err === "object" && "message" in err) {
     const m = (err as { message?: unknown }).message;
     if (typeof m === "string" && /email claim/i.test(m)) {
-      return "Your GitHub account doesn't have a verified email. Add and verify one at github.com/settings/emails and try again.";
+      const provider = providerLabel ?? "account";
+      return `Your ${provider} account doesn't expose a verified email. Add and verify one in your ${provider} settings and try again.`;
     }
     if (typeof m === "string" && m) return m;
   }
