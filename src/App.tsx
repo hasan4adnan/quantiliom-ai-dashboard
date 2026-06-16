@@ -8,6 +8,8 @@ import ProjectsPage from "./pages/ProjectsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import UpgradePage from "./pages/UpgradePage";
 import AccountPage from "./pages/AccountPage";
+import TermsPage from "./pages/TermsPage";
+import PrivacyPage from "./pages/PrivacyPage";
 import { useRoute, type Route } from "./lib/router";
 import type { LocalUser } from "./lib/api";
 import { auth, signOut, type User } from "./lib/firebase";
@@ -202,10 +204,21 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
   );
 }
 
-export default function App() {
+// Top-level switch. Legal pages render outside AuthGate so they are
+// reachable both before sign-in (from the LoginScreen footer links) and
+// after, without needing to spin up the dashboard shell or hit the
+// backend /api/auth/verify endpoint.
+function PublicRouter() {
+  const { route } = useRoute();
+  if (route === "terms") return <TermsPage />;
+  if (route === "privacy") return <PrivacyPage />;
   return (
     <AuthGate>
       {(fbUser, localUser) => <Shell fbUser={fbUser} localUser={localUser} />}
     </AuthGate>
   );
+}
+
+export default function App() {
+  return <PublicRouter />;
 }

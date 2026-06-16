@@ -28,7 +28,9 @@ export type Route =
   | "templates"
   | "subscription"
   | "upgrade"
-  | "account";
+  | "account"
+  | "terms"
+  | "privacy";
 
 const ROUTES: readonly Route[] = [
   "home",
@@ -39,6 +41,8 @@ const ROUTES: readonly Route[] = [
   "subscription",
   "upgrade",
   "account",
+  "terms",
+  "privacy",
 ];
 
 type ParsedHash = { route: Route; param: string | null };

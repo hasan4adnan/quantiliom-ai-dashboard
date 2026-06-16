@@ -360,8 +360,9 @@ export default function UpgradePage({ planKey, prefilledEmail, onNavigate }: Pro
 
               <p className="upgrade-legal">
                 By upgrading, you authorise Quantiliom to charge your card per
-                the schedule above. You agree to our <a href="#">Terms</a> and{" "}
-                <a href="#">Privacy Policy</a>. Demo only &mdash; no charge.
+                the schedule above. You agree to our <a href="#terms">Terms</a>{" "}
+                and <a href="#privacy">Privacy Policy</a>. Demo only &mdash; no
+                charge.
               </p>
             </form>
           )}

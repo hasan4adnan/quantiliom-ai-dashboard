@@ -430,8 +430,8 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
           </form>
 
           <p className="legal">
-            {legalPrompt} you agree to our <a href={`${WEBSITE_URL}/`}>Terms of Service</a>{" "}
-            and <a href={`${WEBSITE_URL}/`}>Privacy Policy</a>.
+            {legalPrompt} you agree to our <a href="#terms">Terms of Service</a>{" "}
+            and <a href="#privacy">Privacy Policy</a>.
           </p>
 
           <p className="mode-toggle-row">

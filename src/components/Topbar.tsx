@@ -19,6 +19,8 @@ const ROUTE_LABEL: Record<Route, string> = {
   subscription: "Subscription",
   upgrade: "Upgrade",
   account: "Account",
+  terms: "Terms of Service",
+  privacy: "Privacy Policy",
 };
 
 function initials(name: string): string {
