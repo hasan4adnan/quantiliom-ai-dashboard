@@ -226,11 +226,6 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
           Back to home
         </button>
 
-        <div className="r-top-link">
-          No account?{" "}
-          <a href={`${WEBSITE_URL}/contact-sales.html`}>Get started →</a>
-        </div>
-
         <div className="r-form-wrap">
           <h1 className="r-heading">{heading}</h1>
           <p className="r-subhead">{subhead}</p>
