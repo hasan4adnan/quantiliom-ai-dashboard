@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import {
   auth,
   createUserWithEmailAndPassword,
+  GithubAuthProvider,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
@@ -36,6 +37,7 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [githubBusy, setGithubBusy] = useState(false);
   const emailRef = useRef<HTMLInputElement | null>(null);
 
   // Sync mode <-> URL hash so the website can deep-link to /#signup.
@@ -120,6 +122,30 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
     }
   }
 
+  async function handleGitHub() {
+    if (githubBusy || !auth) return;
+    clearFlash();
+    setGithubBusy(true);
+    try {
+      const provider = new GithubAuthProvider();
+      // Without this scope GitHub returns email=null for users whose
+      // primary address is marked private — which would make our
+      // backend reject the ID token (POST /api/auth/verify requires an
+      // email claim). Requesting user:email forces GitHub to send the
+      // primary verified email even if it's private.
+      provider.addScope("user:email");
+      await signInWithPopup(auth, provider);
+      // AuthGate's onAuthStateChanged subscriber takes it from here.
+    } catch (err) {
+      const code = errorCode(err);
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        setError(friendlyAuthError(err));
+      }
+    } finally {
+      setGithubBusy(false);
+    }
+  }
+
   const heading = mode === "signin" ? "Welcome back." : "Create your account.";
   const subhead =
     mode === "signin"
@@ -189,10 +215,11 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
             <button
               type="button"
               className="social-btn"
-              onClick={() => setError("GitHub Sign-In is not configured yet.")}
+              onClick={handleGitHub}
+              disabled={githubBusy}
             >
               <GitHubLogo />
-              GitHub
+              {githubBusy ? "Connecting…" : "GitHub"}
             </button>
             <button
               type="button"
@@ -234,7 +261,18 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
             </span>
           </div>
 
-          <form onSubmit={handleEmailSubmit} noValidate>
+          {/* method="post" + action="#" are intentional: we preventDefault
+              and route through Firebase in JS, but browsers (Safari /
+              Chrome / Firefox) look for these attributes when deciding
+              whether to offer to save the credentials to the OS password
+              manager. action="#" never actually navigates because of the
+              preventDefault. */}
+          <form
+            onSubmit={handleEmailSubmit}
+            method="post"
+            action="#"
+            noValidate
+          >
             <div className="auth-field">
               <label className="auth-field-label" htmlFor="auth-email">
                 Email
@@ -243,10 +281,18 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
                 <input
                   ref={emailRef}
                   id="auth-email"
+                  // `name` is required for browser/keychain heuristics to
+                  // pair the identifier field with the password field
+                  // below; without it Safari won't offer to save.
+                  name="email"
                   className="auth-field-input"
                   type="email"
                   placeholder="you@company.com"
-                  autoComplete="email"
+                  // "username" (not "email") is Apple's canonical pairing
+                  // token for password-manager flows where the identifier
+                  // happens to be an email. Chrome/Firefox accept both
+                  // but "username" gives the most reliable save prompt.
+                  autoComplete="username"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -264,6 +310,7 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
               <div className="auth-field-input-wrap">
                 <input
                   id="auth-password"
+                  name="password"
                   className="auth-field-input has-icon"
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
@@ -294,6 +341,7 @@ export default function LoginScreen({ initialMode = "signin" }: Props) {
                 <div className="auth-field-input-wrap">
                   <input
                     id="auth-password-confirm"
+                    name="password_confirm"
                     className="auth-field-input"
                     type={showPassword ? "text" : "password"}
                     placeholder="••••••••"
@@ -440,10 +488,23 @@ function friendlyAuthError(err: unknown): string {
     "auth/too-many-requests": "Too many attempts. Please try again later.",
     "auth/network-request-failed": "Network error. Check your connection.",
     "auth/popup-blocked": "Popup blocked by the browser. Please allow popups and retry.",
+    // GitHub (and any OAuth provider) — Firebase throws this when the
+    // same email is already registered against a different provider.
+    // Most common path: user signed up with Google, then later clicks
+    // GitHub with an account that resolves to the same address.
+    "auth/account-exists-with-different-credential":
+      "An account with this email already exists, but with a different sign-in method. Use the original method to sign in.",
   };
   if (map[code]) return map[code];
+
+  // GitHub-specific: the user's GitHub account has no verified email.
+  // Our backend rejects tokens without an email claim, so surface that
+  // as actionable advice instead of the raw backend error.
   if (err && typeof err === "object" && "message" in err) {
     const m = (err as { message?: unknown }).message;
+    if (typeof m === "string" && /email claim/i.test(m)) {
+      return "Your GitHub account doesn't have a verified email. Add and verify one at github.com/settings/emails and try again.";
+    }
     if (typeof m === "string" && m) return m;
   }
   return "Sign-in failed. Please try again.";

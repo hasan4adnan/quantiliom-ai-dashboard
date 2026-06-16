@@ -19,6 +19,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  GithubAuthProvider,
   type Auth,
   type User,
 } from "firebase/auth";
@@ -50,5 +51,6 @@ export {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  GithubAuthProvider,
 };
 export type { User };
