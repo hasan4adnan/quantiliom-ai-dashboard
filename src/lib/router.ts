@@ -29,6 +29,7 @@ export type Route =
   | "subscription"
   | "upgrade"
   | "account"
+  | "settings"
   | "terms"
   | "privacy";
 
@@ -41,6 +42,7 @@ const ROUTES: readonly Route[] = [
   "subscription",
   "upgrade",
   "account",
+  "settings",
   "terms",
   "privacy",
 ];

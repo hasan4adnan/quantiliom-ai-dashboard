@@ -8,6 +8,7 @@ import {
   TemplateIcon,
   UserIcon,
   CreditCardIcon,
+  SettingsIcon,
 } from "./icons";
 
 type NavKey = Route;
@@ -29,6 +30,7 @@ const PRIMARY: Item[] = [
 
 const SECONDARY: Item[] = [
   { key: "subscription", label: "Subscription", icon: CreditCardIcon },
+  { key: "settings", label: "Settings", icon: SettingsIcon },
   { key: "account", label: "Account", icon: UserIcon },
 ];
 

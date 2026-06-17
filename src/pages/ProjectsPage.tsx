@@ -7,6 +7,7 @@ import {
   FolderIcon,
   PlusIcon,
   SearchIcon,
+  StarIcon,
 } from "../components/icons";
 
 type Status = "Draft" | "In review" | "Ready" | "Active" | "Archived";
@@ -116,6 +117,32 @@ function statusPillClass(status: Status): string {
   }
 }
 
+function statusKey(status: Status): string {
+  switch (status) {
+    case "In review":
+      return "review";
+    case "Ready":
+      return "ready";
+    case "Active":
+      return "active";
+    case "Archived":
+      return "archived";
+    default:
+      return "draft";
+  }
+}
+
+// Normalise a tech name into a stable data-attribute key. e.g.
+// "Node.js" → "nodejs", "React Native" → "react-native". Used by CSS
+// to pick up the brand color for that tech.
+function techKey(t: string): string {
+  return t
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 type Props = {
   onNavigate: (r: Route) => void;
 };
@@ -221,12 +248,30 @@ function NewProjectCard({ onClick }: { onClick: () => void }) {
 
 function ProjectCard({ project }: { project: Project }) {
   return (
-    <article className="proj-card" aria-label={project.title}>
+    <article
+      className="proj-card"
+      data-status={statusKey(project.status)}
+      aria-label={project.title}
+    >
+      <span className="proj-card-strip" aria-hidden="true" />
       <header className="proj-card-head">
         <div className="proj-card-mark" aria-hidden="true">
           <FolderIcon size={16} />
         </div>
-        <span className={statusPillClass(project.status)}>{project.status}</span>
+        <div className="proj-card-head-right">
+          {project.starred ? (
+            <span
+              className="proj-card-star"
+              title="Starred"
+              aria-label="Starred project"
+            >
+              <StarIcon size={13} />
+            </span>
+          ) : null}
+          <span className={statusPillClass(project.status)}>
+            {project.status}
+          </span>
+        </div>
       </header>
 
       <div className="proj-card-body">
@@ -236,7 +281,8 @@ function ProjectCard({ project }: { project: Project }) {
 
       <div className="proj-tech">
         {project.tech.map((t) => (
-          <span key={t} className="proj-tech-chip">
+          <span key={t} className="proj-tech-chip" data-tech={techKey(t)}>
+            <span className="proj-tech-dot" aria-hidden="true" />
             {t}
           </span>
         ))}

@@ -8,11 +8,17 @@ import ProjectsPage from "./pages/ProjectsPage";
 import SubscriptionPage from "./pages/SubscriptionPage";
 import UpgradePage from "./pages/UpgradePage";
 import AccountPage from "./pages/AccountPage";
+import SettingsPage from "./pages/SettingsPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
 import { useRoute, type Route } from "./lib/router";
 import type { LocalUser } from "./lib/api";
 import { auth, signOut, type User } from "./lib/firebase";
+import { bootstrapSettings } from "./lib/settings";
+
+// Apply the user's saved appearance (theme/accent/font scale) at module
+// load so we don't flash the defaults before React mounts.
+bootstrapSettings();
 
 function planLabel(plan: string): string {
   if (!plan) return "Free Plan";
@@ -122,6 +128,7 @@ function renderPage(args: {
       />
     );
   }
+  if (route === "settings") return <SettingsPage onNavigate={navigate} />;
   return <ComingSoonPage route={route} onBack={() => navigate("home")} />;
 }
 
