@@ -2608,6 +2608,75 @@
   }
 }
 
+/* Requirements preview — compact summary of normalized requirements.
+ * Reuses .discovery-quest-shell as the container; only the facet grid
+ * and small list styles below are net-new. */
+.requirements-facet-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-8);
+}
+
+.requirements-facet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+
+.requirements-facet-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.requirements-facet-value {
+  font-size: 14px;
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+  word-break: break-word;
+}
+
+.requirements-section-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  margin-bottom: var(--space-8);
+}
+
+.requirements-section-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.requirements-list {
+  list-style: disc;
+  padding-left: var(--space-20);
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.requirements-list li {
+  margin: 0 0 var(--space-4);
+}
+
+.requirements-section-more {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
 /* ═════════════════════════════════════════════════════════════════════════
  * Section grid + cards
  * ═════════════════════════════════════════════════════════════════════════ */

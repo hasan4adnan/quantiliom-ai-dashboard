@@ -11,6 +11,8 @@ import {
 import AiInputPanel from "../components/AiInputPanel";
 import DiscoveryLoadingPanel from "../components/DiscoveryLoadingPanel";
 import DiscoveryQuestionnaire from "../components/DiscoveryQuestionnaire";
+import RequirementsLoadingPanel from "../components/RequirementsLoadingPanel";
+import RequirementsPreview from "../components/RequirementsPreview";
 import {
   ArrowRightIcon,
   GaugeIcon,
@@ -21,7 +23,11 @@ import {
 } from "../components/icons";
 import {
   createAiDiscoveryJob,
+  createAiRequirementsJob,
   getAiDiscoveryJob,
+  getAiRequirementsJob,
+  type AiAnswer,
+  type AiAnswerValue,
   type AiQuestion,
   type RequirementAnalysis,
 } from "../lib/api";
@@ -29,6 +35,13 @@ import {
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 60;
 const MAX_DESCRIPTION_LENGTH = 2000;
+
+type DiscoveryContext = {
+  description: string;
+  discoveryId: string;
+  analysis: RequirementAnalysis | null;
+  questions: AiQuestion[];
+};
 
 type Phase =
   | { kind: "brief" }
@@ -40,7 +53,23 @@ type Phase =
       analysis: RequirementAnalysis | null;
       questions: AiQuestion[];
     }
-  | { kind: "error"; description: string; message: string };
+  | { kind: "error"; description: string; message: string }
+  | ({
+      kind: "requirements-loading";
+      answers: AiAnswer[];
+      requirementsJobId: string | null;
+    } & DiscoveryContext)
+  | ({
+      kind: "requirements-ready";
+      answers: AiAnswer[];
+      requirementsJobId: string;
+      requirements: unknown;
+    } & DiscoveryContext)
+  | ({
+      kind: "requirements-error";
+      answers: AiAnswer[];
+      message: string;
+    } & DiscoveryContext);
 
 type Props = {
   firstName: string;
@@ -204,6 +233,189 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
     void startDiscovery(phase.description);
   }, [phase, startDiscovery]);
 
+  /* ── Requirements phase ─────────────────────────────────────────── */
+
+  const pollRequirementsOnce = useCallback(
+    async (ctx: DiscoveryContext, answers: AiAnswer[], reqJobId: string) => {
+      if (cancelledRef.current) return;
+      try {
+        const idToken = await getIdToken();
+        const res = await getAiRequirementsJob(idToken, reqJobId);
+        if (cancelledRef.current) return;
+
+        const job = res.job;
+        if (job.status === "succeeded") {
+          const req = job.requirements;
+          if (!req || typeof req !== "object" || Array.isArray(req)) {
+            setPhase({
+              kind: "requirements-error",
+              ...ctx,
+              answers,
+              message:
+                "Requirements synthesis finished but the result was empty. Try again.",
+            });
+          } else {
+            setPhase({
+              kind: "requirements-ready",
+              ...ctx,
+              answers,
+              requirementsJobId: reqJobId,
+              requirements: req,
+            });
+          }
+          stopPolling();
+          return;
+        }
+        if (job.status === "failed") {
+          setPhase({
+            kind: "requirements-error",
+            ...ctx,
+            answers,
+            message:
+              "We couldn't synthesize requirements from those answers. Edit your answers and try again.",
+          });
+          stopPolling();
+          return;
+        }
+
+        attemptRef.current += 1;
+        if (attemptRef.current >= MAX_POLL_ATTEMPTS) {
+          setPhase({
+            kind: "requirements-error",
+            ...ctx,
+            answers,
+            message:
+              "Synthesizing requirements is taking longer than expected. Try again in a moment.",
+          });
+          stopPolling();
+          return;
+        }
+
+        timerRef.current = window.setTimeout(() => {
+          void pollRequirementsOnce(ctx, answers, reqJobId);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "requirements-error",
+          ...ctx,
+          answers,
+          message: safeErrorMessage(
+            err,
+            "We couldn't reach the requirements service. Try again."
+          ),
+        });
+        stopPolling();
+      }
+    },
+    [getIdToken, stopPolling]
+  );
+
+  const startRequirementsSubmission = useCallback(
+    async (ctx: DiscoveryContext, answers: AiAnswer[]) => {
+      stopPolling();
+      setPhase({
+        kind: "requirements-loading",
+        ...ctx,
+        answers,
+        requirementsJobId: null,
+      });
+      try {
+        const idToken = await getIdToken();
+        const res = await createAiRequirementsJob(idToken, ctx.discoveryId, {
+          answers,
+        });
+        if (cancelledRef.current) return;
+        attemptRef.current = 0;
+        setPhase({
+          kind: "requirements-loading",
+          ...ctx,
+          answers,
+          requirementsJobId: res.job.id,
+        });
+        timerRef.current = window.setTimeout(() => {
+          void pollRequirementsOnce(ctx, answers, res.job.id);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "requirements-error",
+          ...ctx,
+          answers,
+          message: safeErrorMessage(
+            err,
+            "We couldn't start requirements synthesis. Try again."
+          ),
+        });
+      }
+    },
+    [getIdToken, pollRequirementsOnce, stopPolling]
+  );
+
+  const handleSubmitAnswers = useCallback(
+    (answers: AiAnswer[]) => {
+      if (phase.kind !== "questions") return;
+      void startRequirementsSubmission(
+        {
+          description: phase.description,
+          discoveryId: phase.jobId,
+          analysis: phase.analysis,
+          questions: phase.questions,
+        },
+        answers
+      );
+    },
+    [phase, startRequirementsSubmission]
+  );
+
+  const handleBackToQuestions = useCallback(() => {
+    if (
+      phase.kind !== "requirements-ready" &&
+      phase.kind !== "requirements-error" &&
+      phase.kind !== "requirements-loading"
+    ) {
+      return;
+    }
+    stopPolling();
+    setPhase({
+      kind: "questions",
+      description: phase.description,
+      jobId: phase.discoveryId,
+      analysis: phase.analysis,
+      questions: phase.questions,
+    });
+  }, [phase, stopPolling]);
+
+  const handleRetryRequirements = useCallback(() => {
+    if (phase.kind !== "requirements-error") return;
+    void startRequirementsSubmission(
+      {
+        description: phase.description,
+        discoveryId: phase.discoveryId,
+        analysis: phase.analysis,
+        questions: phase.questions,
+      },
+      phase.answers
+    );
+  }, [phase, startRequirementsSubmission]);
+
+  const initialAnswersMap = useMemo<
+    Record<string, AiAnswerValue> | undefined
+  >(() => {
+    if (
+      phase.kind !== "requirements-loading" &&
+      phase.kind !== "requirements-ready" &&
+      phase.kind !== "requirements-error"
+    ) {
+      return undefined;
+    }
+    const a = phase.answers;
+    if (!a || a.length === 0) return undefined;
+    const map: Record<string, AiAnswerValue> = {};
+    for (const item of a) map[item.questionId] = item.value;
+    return map;
+  }, [phase]);
+
   if (phase.kind === "loading") {
     return (
       <DiscoveryFlowFrame>
@@ -220,6 +432,38 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
         <DiscoveryQuestionnaire
           analysis={phase.analysis}
           questions={phase.questions}
+          onReset={handleReset}
+          onSubmitAnswers={handleSubmitAnswers}
+          initialAnswers={initialAnswersMap}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "requirements-loading") {
+    return (
+      <DiscoveryFlowFrame>
+        <RequirementsLoadingPanel onCancel={handleReset} />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "requirements-ready") {
+    return (
+      <DiscoveryFlowFrame>
+        <RequirementsPreview
+          requirements={phase.requirements}
+          onBackToQuestions={handleBackToQuestions}
+          onStartOver={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "requirements-error") {
+    return (
+      <DiscoveryFlowFrame>
+        <RequirementsErrorPanel
+          message={phase.message}
+          onRetry={handleRetryRequirements}
+          onBackToQuestions={handleBackToQuestions}
           onReset={handleReset}
         />
       </DiscoveryFlowFrame>
@@ -263,6 +507,56 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
 
 function DiscoveryFlowFrame({ children }: { children: ReactNode }) {
   return <section className="discovery-flow">{children}</section>;
+}
+
+function RequirementsErrorPanel({
+  message,
+  onRetry,
+  onBackToQuestions,
+  onReset,
+}: {
+  message: string;
+  onRetry: () => void;
+  onBackToQuestions: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="discovery-error-card" role="alert">
+      <div className="discovery-flow-eyebrow">
+        <span className="discovery-flow-eyebrow-dot" aria-hidden="true" />
+        Requirements
+      </div>
+      <h2 className="discovery-flow-title">
+        We couldn&rsquo;t synthesize requirements
+      </h2>
+      <p className="discovery-flow-sub">{message}</p>
+      <div className="discovery-flow-foot discovery-flow-foot-split">
+        <div className="discovery-flow-foot-left">
+          <button
+            type="button"
+            className="wiz-btn wiz-btn-ghost"
+            onClick={onReset}
+          >
+            Start over
+          </button>
+          <button
+            type="button"
+            className="wiz-btn wiz-btn-ghost"
+            onClick={onBackToQuestions}
+          >
+            ← Back to questions
+          </button>
+        </div>
+        <button
+          type="button"
+          className="wiz-btn wiz-btn-dark"
+          onClick={onRetry}
+        >
+          Try again →
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function ErrorPanel({

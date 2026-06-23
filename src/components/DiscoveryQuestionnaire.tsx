@@ -1,12 +1,31 @@
-import { useState } from "react";
-import type { AiQuestion, RequirementAnalysis } from "../lib/api";
+import { useMemo, useState } from "react";
+import type {
+  AiAnswer,
+  AiAnswerValue,
+  AiQuestion,
+  RequirementAnalysis,
+} from "../lib/api";
 
-type AnswerValue = string | string[] | number | boolean | null;
+type AnswerValue = AiAnswerValue;
 
 type Props = {
   analysis: RequirementAnalysis | null;
   questions: AiQuestion[];
   onReset: () => void;
+  /**
+   * Called when the user finishes the review screen and is ready to send
+   * answers to the backend requirements endpoint. The parent owns the
+   * actual POST + polling so this component stays presentational.
+   * Required-question validation runs in this component; the callback is
+   * only invoked when every required question has a non-empty answer.
+   */
+  onSubmitAnswers?: (answers: AiAnswer[]) => void;
+  /**
+   * Seeded answer values, keyed by question id. Used when the parent
+   * navigates the user back to questions from a later phase so their
+   * prior work is preserved.
+   */
+  initialAnswers?: Record<string, AnswerValue>;
 };
 
 function domainLabel(d: RequirementAnalysis["domain"] | undefined): string {
@@ -43,9 +62,21 @@ export default function DiscoveryQuestionnaire({
   analysis,
   questions,
   onReset,
+  onSubmitAnswers,
+  initialAnswers,
 }: Props) {
-  const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
+  const [answers, setAnswers] = useState<Record<string, AnswerValue>>(() =>
+    initialAnswers ? { ...initialAnswers } : {}
+  );
   const [index, setIndex] = useState(0);
+
+  const missingRequired = useMemo(
+    () =>
+      questions.filter(
+        (q) => q.required && !isAnswered(q, answers[q.id] ?? null)
+      ),
+    [questions, answers]
+  );
 
   if (questions.length === 0) {
     return (
@@ -90,6 +121,19 @@ export default function DiscoveryQuestionnaire({
   const canAdvance = current
     ? !current.required || isAnswered(current, answers[current.id] ?? null)
     : true;
+
+  function buildNormalizedAnswers(): AiAnswer[] {
+    return questions.map((q) => ({
+      questionId: q.id,
+      value: normalizeAnswerValue(q, answers[q.id] ?? null),
+    }));
+  }
+
+  function handleContinueToRequirements() {
+    if (!onSubmitAnswers) return;
+    if (missingRequired.length > 0) return;
+    onSubmitAnswers(buildNormalizedAnswers());
+  }
 
   const progressPct =
     (Math.min(index, questions.length) / questions.length) * 100;
@@ -163,14 +207,18 @@ export default function DiscoveryQuestionnaire({
         {atReview ? (
           <div className="discovery-final-cluster">
             <span className="discovery-final-note">
-              Requirements synthesis will be connected in the next step.
+              {missingRequired.length === 0
+                ? "We'll convert your answers into normalized requirements."
+                : missingRequired.length === 1
+                ? "1 required question still needs an answer before you can continue."
+                : `${missingRequired.length} required questions still need answers before you can continue.`}
             </span>
             <button
               type="button"
               className="wiz-btn wiz-btn-dark"
-              disabled
-              aria-disabled="true"
-              title="Coming next: this will send your answers to requirements synthesis."
+              onClick={handleContinueToRequirements}
+              disabled={!onSubmitAnswers || missingRequired.length > 0}
+              aria-disabled={!onSubmitAnswers || missingRequired.length > 0}
             >
               Continue to requirements →
             </button>
@@ -399,4 +447,57 @@ function formatAnswer(q: AiQuestion, v: AnswerValue | undefined): string {
   if (typeof v === "boolean") return v ? "Yes" : "No";
   if (typeof v === "number") return String(v);
   return "—";
+}
+
+/**
+ * Coerce a local React-state answer into the shape the backend wants:
+ *   single_select / text → string | null
+ *   multi_select        → string[] | null (empty array becomes null)
+ *   number              → number | null
+ *   boolean             → boolean | null
+ *
+ * Text values are trimmed; whitespace-only strings collapse to null so
+ * the worker's Zod validation treats them as explicit skips.
+ */
+function normalizeAnswerValue(
+  question: AiQuestion,
+  raw: AnswerValue
+): AiAnswerValue {
+  switch (question.type) {
+    case "text": {
+      if (typeof raw !== "string") return null;
+      const trimmed = raw.trim();
+      return trimmed.length === 0 ? null : trimmed;
+    }
+    case "single_select": {
+      return typeof raw === "string" && raw.length > 0 ? raw : null;
+    }
+    case "multi_select": {
+      if (!Array.isArray(raw)) return null;
+      const cleaned = raw.filter((x): x is string => typeof x === "string");
+      return cleaned.length === 0 ? null : cleaned;
+    }
+    case "number": {
+      return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+    }
+    case "boolean": {
+      return typeof raw === "boolean" ? raw : null;
+    }
+    default: {
+      // Future question type — pass through if already a known scalar.
+      if (
+        typeof raw === "string" ||
+        typeof raw === "number" ||
+        typeof raw === "boolean" ||
+        raw === null
+      ) {
+        return raw;
+      }
+      if (Array.isArray(raw)) {
+        const cleaned = raw.filter((x): x is string => typeof x === "string");
+        return cleaned.length === 0 ? null : cleaned;
+      }
+      return null;
+    }
+  }
 }
