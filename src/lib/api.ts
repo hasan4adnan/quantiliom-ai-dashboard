@@ -249,3 +249,133 @@ export function safeUserSummary(u: LocalUser) {
     onboardingStatus: u.onboardingStatus,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* AI job API (Step 9a — types + wrappers only, no UI wiring)         */
+/* ------------------------------------------------------------------ */
+
+export type AiJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export type AiJobSummary = {
+  id: string;
+  status: AiJobStatus;
+  description: string | null;
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /**
+   * Server-suggested polling URL. Informational only — the client wrappers
+   * call by job id against BACKEND_URL so a misconfigured backend can't
+   * redirect us off-origin.
+   */
+  pollUrl: string;
+};
+
+export type AiJobDetail = AiJobSummary & {
+  result: unknown | null;
+  errorMessage: string | null;
+};
+
+export type CreateAiJobInput = {
+  description?: string;
+  requirements: Record<string, unknown>;
+};
+
+export type CreateAiJobResponse = {
+  success: true;
+  job: AiJobSummary;
+};
+
+export type GetAiJobResponse = {
+  success: true;
+  job: AiJobDetail;
+};
+
+export type ListAiJobsOptions = {
+  limit?: number;
+  status?: AiJobStatus;
+};
+
+export type ListAiJobsResponse = {
+  success: true;
+  jobs: AiJobSummary[];
+  count: number;
+};
+
+/**
+ * POST /api/jobs — create + enqueue an AI architecture job.
+ *
+ * Returns the summary (no result yet). Caller should then poll
+ * getAiJob(idToken, summary.id) until status is "succeeded" or "failed".
+ */
+export async function createAiJob(
+  idToken: string,
+  input: CreateAiJobInput
+): Promise<AiJobSummary> {
+  const res = await fetch(`${BACKEND_URL}/api/jobs`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return data.job as AiJobSummary;
+}
+
+/**
+ * GET /api/jobs/:id — fetch the latest snapshot of a single job. The
+ * detail shape includes the result payload once the job has succeeded.
+ */
+export async function getAiJob(
+  idToken: string,
+  jobId: string
+): Promise<AiJobDetail> {
+  const res = await fetch(
+    `${BACKEND_URL}/api/jobs/${encodeURIComponent(jobId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${idToken}` },
+    }
+  );
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return data.job as AiJobDetail;
+}
+
+/**
+ * GET /api/jobs — list the caller's recent AI jobs. Server caps at
+ * limit=50 and defaults to 20. Summaries omit the result payload by
+ * design; call getAiJob for the full detail when needed.
+ */
+export async function listAiJobs(
+  idToken: string,
+  options?: ListAiJobsOptions
+): Promise<AiJobSummary[]> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options?.status !== undefined) {
+    params.set("status", options.status);
+  }
+  const qs = params.toString();
+  const url = qs ? `${BACKEND_URL}/api/jobs?${qs}` : `${BACKEND_URL}/api/jobs`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !Array.isArray(data.jobs)) {
+    throw new Error(bubbleError(data, res));
+  }
+  return data.jobs as AiJobSummary[];
+}
