@@ -1,5 +1,16 @@
-import { useMemo, type ComponentType, type SVGProps } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import AiInputPanel from "../components/AiInputPanel";
+import DiscoveryLoadingPanel from "../components/DiscoveryLoadingPanel";
+import DiscoveryQuestionnaire from "../components/DiscoveryQuestionnaire";
 import {
   ArrowRightIcon,
   GaugeIcon,
@@ -8,26 +19,234 @@ import {
   SparkIcon,
   StoreIcon,
 } from "../components/icons";
+import {
+  createAiDiscoveryJob,
+  getAiDiscoveryJob,
+  type AiQuestion,
+  type RequirementAnalysis,
+} from "../lib/api";
+
+const POLL_INTERVAL_MS = 3000;
+const MAX_POLL_ATTEMPTS = 60;
+const MAX_DESCRIPTION_LENGTH = 2000;
+
+type Phase =
+  | { kind: "brief" }
+  | { kind: "loading"; description: string; jobId: string | null }
+  | {
+      kind: "questions";
+      description: string;
+      jobId: string;
+      analysis: RequirementAnalysis | null;
+      questions: AiQuestion[];
+    }
+  | { kind: "error"; description: string; message: string };
 
 type Props = {
   firstName: string;
   /**
    * Resolves a fresh Firebase ID token from the authenticated session.
-   * Provided by App.tsx via the AuthGate `fbUser`. Calls into discovery API
-   * wrappers are token-gated and must never store the token locally.
+   * Provided by App.tsx via the AuthGate `fbUser`. The discovery flow is
+   * token-gated and must never store the token locally.
    */
   getIdToken: () => Promise<string>;
 };
 
+function safeErrorMessage(err: unknown, fallback: string): string {
+  if (err instanceof Error && err.message) {
+    const m = err.message;
+    return m.length > 240 ? `${m.slice(0, 240)}…` : m;
+  }
+  return fallback;
+}
+
 export default function DashboardHome({ firstName, getIdToken }: Props) {
   const greeting = useMemo(() => greetingFor(new Date()), []);
+  const [brief, setBrief] = useState("");
+  const [phase, setPhase] = useState<Phase>({ kind: "brief" });
+
+  const cancelledRef = useRef(false);
+  const timerRef = useRef<number | null>(null);
+  const attemptRef = useRef(0);
+
+  useEffect(() => {
+    cancelledRef.current = false;
+    return () => {
+      cancelledRef.current = true;
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
+  const stopPolling = useCallback(() => {
+    if (timerRef.current !== null) {
+      window.clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    attemptRef.current = 0;
+  }, []);
+
+  const handleReset = useCallback(() => {
+    stopPolling();
+    if (!cancelledRef.current) setPhase({ kind: "brief" });
+  }, [stopPolling]);
+
+  const pollOnce = useCallback(
+    async (description: string, jobId: string) => {
+      if (cancelledRef.current) return;
+      try {
+        const idToken = await getIdToken();
+        const res = await getAiDiscoveryJob(idToken, jobId);
+        if (cancelledRef.current) return;
+
+        const job = res.job;
+        if (job.status === "succeeded") {
+          const questions = Array.isArray(job.questions) ? job.questions : [];
+          setPhase({
+            kind: "questions",
+            description,
+            jobId,
+            analysis: job.analysis ?? null,
+            questions,
+          });
+          stopPolling();
+          return;
+        }
+        if (job.status === "failed") {
+          setPhase({
+            kind: "error",
+            description,
+            message:
+              "We couldn't generate questions for that description. Edit the brief and try again.",
+          });
+          stopPolling();
+          return;
+        }
+
+        attemptRef.current += 1;
+        if (attemptRef.current >= MAX_POLL_ATTEMPTS) {
+          setPhase({
+            kind: "error",
+            description,
+            message:
+              "Generating questions is taking longer than expected. Try again in a moment.",
+          });
+          stopPolling();
+          return;
+        }
+
+        timerRef.current = window.setTimeout(() => {
+          void pollOnce(description, jobId);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "error",
+          description,
+          message: safeErrorMessage(
+            err,
+            "We couldn't reach the discovery service. Try again."
+          ),
+        });
+        stopPolling();
+      }
+    },
+    [getIdToken, stopPolling]
+  );
+
+  const startDiscovery = useCallback(
+    async (description: string) => {
+      stopPolling();
+      setPhase({ kind: "loading", description, jobId: null });
+      try {
+        const idToken = await getIdToken();
+        const res = await createAiDiscoveryJob(idToken, { description });
+        if (cancelledRef.current) return;
+
+        attemptRef.current = 0;
+        setPhase({ kind: "loading", description, jobId: res.job.id });
+        timerRef.current = window.setTimeout(() => {
+          void pollOnce(description, res.job.id);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "error",
+          description,
+          message: safeErrorMessage(
+            err,
+            "We couldn't start the discovery service. Try again."
+          ),
+        });
+      }
+    },
+    [getIdToken, pollOnce, stopPolling]
+  );
+
+  const handleSubmit = useCallback(() => {
+    const description = brief.trim();
+    if (!description) return;
+    if (description.length > MAX_DESCRIPTION_LENGTH) {
+      setPhase({
+        kind: "error",
+        description,
+        message: `Please keep your description under ${MAX_DESCRIPTION_LENGTH} characters.`,
+      });
+      return;
+    }
+    void startDiscovery(description);
+  }, [brief, startDiscovery]);
+
+  const handleRetry = useCallback(() => {
+    if (phase.kind !== "error") return;
+    void startDiscovery(phase.description);
+  }, [phase, startDiscovery]);
+
+  if (phase.kind === "loading") {
+    return (
+      <DiscoveryFlowFrame>
+        <DiscoveryLoadingPanel
+          description={phase.description}
+          onCancel={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "questions") {
+    return (
+      <DiscoveryFlowFrame>
+        <DiscoveryQuestionnaire
+          analysis={phase.analysis}
+          questions={phase.questions}
+          onReset={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "error") {
+    return (
+      <DiscoveryFlowFrame>
+        <ErrorPanel
+          message={phase.message}
+          onRetry={handleRetry}
+          onReset={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
 
   return (
     <>
       <Hero firstName={firstName} greeting={greeting} />
 
       <section className="home-block">
-        <AiInputPanel getIdToken={getIdToken} />
+        <AiInputPanel
+          value={brief}
+          onChange={setBrief}
+          onSubmit={handleSubmit}
+        />
       </section>
 
       <RecentActivity />
@@ -39,6 +258,49 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
         their place once the backend lands.
       </p>
     </>
+  );
+}
+
+function DiscoveryFlowFrame({ children }: { children: ReactNode }) {
+  return <section className="discovery-flow">{children}</section>;
+}
+
+function ErrorPanel({
+  message,
+  onRetry,
+  onReset,
+}: {
+  message: string;
+  onRetry: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="discovery-error-card" role="alert">
+      <div className="discovery-flow-eyebrow">
+        <span className="discovery-flow-eyebrow-dot" aria-hidden="true" />
+        Discovery
+      </div>
+      <h2 className="discovery-flow-title">
+        We couldn&rsquo;t finish discovery
+      </h2>
+      <p className="discovery-flow-sub">{message}</p>
+      <div className="discovery-flow-foot discovery-flow-foot-split">
+        <button
+          type="button"
+          className="wiz-btn wiz-btn-ghost"
+          onClick={onReset}
+        >
+          Start over
+        </button>
+        <button
+          type="button"
+          className="wiz-btn wiz-btn-dark"
+          onClick={onRetry}
+        >
+          Try again →
+        </button>
+      </div>
+    </div>
   );
 }
 

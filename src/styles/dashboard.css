@@ -2099,42 +2099,46 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
- * Discovery result preview — read-only summary + question list shown
- * beneath .ai-panel once a discovery job succeeds. Uses existing tokens
- * and visual language; no new design.
+ * Discovery flow — loading, questions, review and error screens shown in
+ * the home content area while a discovery job is in flight or its result
+ * is being reviewed. Reuses existing tokens and the dashboard card style.
  * ═════════════════════════════════════════════════════════════════════════ */
-.discovery-result {
-  margin-top: var(--space-12);
+.discovery-flow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-8) 0 var(--space-32);
+}
+
+.discovery-loading-card,
+.discovery-quest-shell,
+.discovery-error-card,
+.discovery-empty-card {
+  width: 100%;
+  max-width: 760px;
   background: var(--surface-card);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-sm);
-  padding: var(--space-20);
+  padding: var(--space-32);
   display: flex;
   flex-direction: column;
-  gap: var(--space-14);
-  animation: notice-in 240ms var(--ease-spring) both;
+  gap: var(--space-16);
+  animation: notice-in 280ms var(--ease-spring) both;
 }
 
-.discovery-result-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-12);
-}
-
-.discovery-result-eyebrow {
+.discovery-flow-eyebrow {
   display: inline-flex;
   align-items: center;
   gap: var(--space-10);
   font-family: var(--font-mono);
   font-size: 11.5px;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-secondary);
 }
 
-.discovery-result-eyebrow-dot {
+.discovery-flow-eyebrow-dot {
   width: 7px;
   height: 7px;
   border-radius: 50%;
@@ -2142,41 +2146,142 @@
   box-shadow: 0 0 0 3px rgba(239, 111, 46, 0.15);
 }
 
-.discovery-result-reset {
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
-  transition: color var(--dur-fast) var(--ease-out),
-    background var(--dur-fast) var(--ease-out);
-}
-
-.discovery-result-reset:hover {
+.discovery-flow-title {
+  font-size: 28px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
   color: var(--text-primary);
-  background: var(--gray-50);
-}
-
-.discovery-result-summary {
-  font-size: 14.5px;
-  line-height: 1.55;
-  color: var(--text-primary);
-  letter-spacing: -0.003em;
   margin: 0;
 }
 
-.discovery-result-meta {
+.discovery-flow-sub {
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.discovery-flow-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-12);
+  margin-top: var(--space-8);
+}
+
+.discovery-flow-foot-split {
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.discovery-flow-foot-left {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+/* Loading — brief quote + animated step list */
+.discovery-brief-quote {
+  position: relative;
+  margin: 0;
+  padding: var(--space-14) var(--space-16);
+  background: var(--gray-50);
+  border-left: 2px solid var(--accent);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.discovery-step-list {
+  list-style: none;
+  margin: var(--space-8) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.discovery-step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-8) 0;
+  color: var(--text-muted);
+  transition: color var(--dur-base) var(--ease-out);
+}
+
+.discovery-step.is-done {
+  color: var(--text-primary);
+}
+
+.discovery-step.is-active {
+  color: var(--text-primary);
+}
+
+.discovery-step-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: #fff;
+  color: var(--text-muted);
+  transition: border-color var(--dur-base) var(--ease-out),
+    background var(--dur-base) var(--ease-out),
+    color var(--dur-base) var(--ease-out);
+}
+
+.discovery-step.is-done .discovery-step-icon {
+  background: var(--accent-soft);
+  border-color: rgba(239, 111, 46, 0.32);
+  color: var(--accent);
+}
+
+.discovery-step.is-active .discovery-step-icon {
+  border-color: var(--accent);
+}
+
+.discovery-step-check {
+  font-size: 12px;
+  line-height: 1;
+  font-weight: var(--weight-semibold);
+}
+
+.discovery-step-spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1.4px solid var(--border-default);
+  border-top-color: var(--accent);
+  animation: splash-spin 720ms linear infinite;
+}
+
+.discovery-step-label {
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: -0.005em;
+}
+
+/* Question shell — header, progress, body */
+.discovery-quest-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.discovery-quest-meta {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-8);
 }
 
-.discovery-result-meta-chip {
+.discovery-meta-chip {
   display: inline-flex;
   align-items: center;
   gap: var(--space-6);
@@ -2190,71 +2295,317 @@
   letter-spacing: 0.04em;
 }
 
-.discovery-result-meta-chip strong {
+.discovery-meta-chip strong {
   color: var(--text-primary);
   font-weight: var(--weight-medium);
 }
 
-.discovery-result-questions {
+.discovery-quest-progress {
+  position: relative;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-150);
+  overflow: hidden;
+}
+
+.discovery-quest-progress-bar {
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-pill);
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.discovery-quest-progress-text {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-top: -4px;
+}
+
+.discovery-quest-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.discovery-quest-card {
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.discovery-quest-card-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.discovery-cat-chip,
+.discovery-required-tag,
+.discovery-optional-tag {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.discovery-cat-chip {
+  background: var(--gray-50);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.discovery-required-tag {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border: 1px solid rgba(239, 111, 46, 0.18);
+}
+
+.discovery-optional-tag {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-default);
+}
+
+.discovery-quest-question {
+  font-size: 20px;
+  line-height: 1.32;
+  letter-spacing: -0.012em;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.discovery-quest-help {
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.discovery-quest-input {
+  margin-top: var(--space-8);
+}
+
+/* Option cards (single_select + multi_select) */
+.discovery-opt-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.discovery-opt {
+  display: flex;
+  align-items: center;
+  gap: var(--space-12);
+  width: 100%;
+  padding: var(--space-12) var(--space-14);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text-primary);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.discovery-opt:hover {
+  border-color: var(--text-primary);
+  background: var(--gray-50);
+}
+
+.discovery-opt.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.discovery-opt-marker {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  background: #fff;
+  flex-shrink: 0;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.discovery-opt-marker.is-square {
+  border-radius: 4px;
+}
+
+.discovery-opt.is-selected .discovery-opt-marker {
+  border-color: var(--accent);
+  background: var(--accent);
+  box-shadow: inset 0 0 0 3px #fff;
+}
+
+.discovery-opt.is-selected .discovery-opt-marker.is-square {
+  box-shadow: inset 0 0 0 2.5px #fff;
+}
+
+.discovery-opt-label {
+  line-height: 1.4;
+}
+
+/* Yes/No */
+.discovery-bool-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-12);
+}
+
+.discovery-bool {
+  padding: var(--space-16);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: #fff;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.discovery-bool:hover {
+  border-color: var(--text-primary);
+  background: var(--gray-50);
+}
+
+.discovery-bool.is-selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+/* Number + text inputs */
+.discovery-num-input,
+.discovery-text-input {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: #fff;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-14);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.discovery-num-input:focus,
+.discovery-text-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: var(--shadow-focus-ring);
+}
+
+.discovery-num-input {
+  max-width: 200px;
+}
+
+.discovery-text-input {
+  resize: vertical;
+  min-height: 96px;
+}
+
+/* Review summary at the end */
+.discovery-review-list {
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
 }
 
-.discovery-result-question {
+.discovery-review-row {
   display: grid;
-  grid-template-columns: 28px 1fr auto;
-  align-items: baseline;
-  gap: var(--space-12);
+  grid-template-columns: 1fr;
+  gap: var(--space-4);
   padding: var(--space-12) 0;
   border-top: 1px solid var(--border-subtle);
 }
 
-.discovery-result-question:first-child {
+.discovery-review-row:first-child {
   border-top: 0;
-  padding-top: var(--space-4);
+  padding-top: 0;
 }
 
-.discovery-result-question-index {
-  font-family: var(--font-mono);
-  font-size: 11.5px;
-  color: var(--text-muted);
-  letter-spacing: 0.08em;
-}
-
-.discovery-result-question-text {
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--text-primary);
-}
-
-.discovery-result-question-cat {
-  font-family: var(--font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.discovery-result-empty {
+.discovery-review-q {
   font-size: 13.5px;
+  line-height: 1.45;
   color: var(--text-muted);
-  font-style: italic;
   margin: 0;
 }
 
-/* Inline spinner used inside .btn-primary while a discovery job is in
- * flight. Reuses splash-spin keyframes defined earlier in this file. */
-.discovery-inline-spinner {
-  display: inline-block;
-  border-radius: 50%;
-  border: 1.4px solid rgba(255, 255, 255, 0.32);
-  border-top-color: #ffffff;
-  animation: splash-spin 720ms linear infinite;
-  flex-shrink: 0;
+.discovery-review-a {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+/* Final action cluster on the review screen */
+.discovery-final-cluster {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.discovery-final-note {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  max-width: 32ch;
+  line-height: 1.4;
+  text-align: right;
+}
+
+@media (max-width: 720px) {
+  .discovery-loading-card,
+  .discovery-quest-shell,
+  .discovery-error-card,
+  .discovery-empty-card {
+    padding: var(--space-20);
+  }
+  .discovery-flow-title {
+    font-size: 24px;
+  }
+  .discovery-flow-foot-split {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .discovery-flow-foot-left {
+    justify-content: space-between;
+  }
+  .discovery-final-cluster {
+    justify-content: stretch;
+  }
+  .discovery-final-note {
+    text-align: left;
+    max-width: none;
+  }
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
