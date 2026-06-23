@@ -379,3 +379,196 @@ export async function listAiJobs(
   }
   return data.jobs as AiJobSummary[];
 }
+
+/* ------------------------------------------------------------------ */
+/* AI discovery job API (Step 9c — types + wrappers only, no UI wiring) */
+/* ------------------------------------------------------------------ */
+
+export type AiDiscoveryJobStatus = "queued" | "running" | "succeeded" | "failed";
+
+export type RequirementAnalysis = {
+  domain:
+    | "saas"
+    | "marketplace"
+    | "chatbot"
+    | "realtime_chat"
+    | "ecommerce"
+    | "other";
+  confidence: number;
+  detectedSignals: string[];
+  missingCriticalInfo: string[];
+  briefSummary: string;
+};
+
+export type AiQuestionCategory =
+  | "scale"
+  | "realtime"
+  | "media"
+  | "payment"
+  | "mobile"
+  | "notifications"
+  | "admin"
+  | "analytics"
+  | "security"
+  | "budget"
+  | "priority"
+  | "features"
+  | "integrations"
+  | "infrastructure"
+  | "other";
+
+export type AiQuestionType =
+  | "single_select"
+  | "multi_select"
+  | "number"
+  | "boolean"
+  | "text";
+
+export type AiQuestion = {
+  id: string;
+  category: AiQuestionCategory;
+  text: string;
+  helpText?: string;
+  type: AiQuestionType;
+  options?: string[];
+  required: boolean;
+};
+
+export type AiDiscoveryJobSummary = {
+  id: string;
+  status: AiDiscoveryJobStatus;
+  description: string;
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /**
+   * Server-suggested polling URL. Informational only — the wrappers call
+   * by job id against BACKEND_URL so a misconfigured backend can't redirect
+   * us off-origin.
+   */
+  pollUrl: string;
+};
+
+export type AiDiscoveryJobDetail = AiDiscoveryJobSummary & {
+  analysis: RequirementAnalysis | null;
+  questions: AiQuestion[] | null;
+  errorMessage: string | null;
+};
+
+export type CreateAiDiscoveryJobInput = {
+  description: string;
+};
+
+export type CreateAiDiscoveryJobResponse = {
+  success: true;
+  job: AiDiscoveryJobSummary;
+};
+
+export type GetAiDiscoveryJobResponse = {
+  success: true;
+  job: AiDiscoveryJobDetail;
+};
+
+export type ListAiDiscoveryJobsOptions = {
+  limit?: number;
+  status?: AiDiscoveryJobStatus;
+};
+
+export type ListAiDiscoveryJobsResponse = {
+  success: true;
+  jobs: AiDiscoveryJobSummary[];
+  count: number;
+};
+
+/**
+ * POST /api/discovery — create + enqueue an AI discovery job that turns a
+ * rough description into a requirement analysis + adaptive follow-up
+ * questions. Returns the summary (no analysis/questions yet). Caller
+ * should then poll getAiDiscoveryJob(idToken, summary.id) until status is
+ * "succeeded" or "failed".
+ */
+export async function createAiDiscoveryJob(
+  idToken: string,
+  input: CreateAiDiscoveryJobInput
+): Promise<CreateAiDiscoveryJobResponse> {
+  const res = await fetch(`${BACKEND_URL}/api/discovery`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify(input),
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    job: data.job as AiDiscoveryJobSummary,
+  };
+}
+
+/**
+ * GET /api/discovery/:id — fetch the latest snapshot of a single discovery
+ * job. The detail shape includes the analysis + questions payload once the
+ * job has succeeded.
+ */
+export async function getAiDiscoveryJob(
+  idToken: string,
+  jobId: string
+): Promise<GetAiDiscoveryJobResponse> {
+  const res = await fetch(
+    `${BACKEND_URL}/api/discovery/${encodeURIComponent(jobId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${idToken}` },
+    }
+  );
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    job: data.job as AiDiscoveryJobDetail,
+  };
+}
+
+/**
+ * GET /api/discovery — list the caller's recent discovery jobs. Server
+ * caps at limit=50 and defaults to 20. Summaries omit the analysis +
+ * questions payload by design; call getAiDiscoveryJob for the full detail
+ * when needed.
+ */
+export async function listAiDiscoveryJobs(
+  idToken: string,
+  options?: ListAiDiscoveryJobsOptions
+): Promise<ListAiDiscoveryJobsResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options?.status !== undefined) {
+    params.set("status", options.status);
+  }
+  const qs = params.toString();
+  const url = qs
+    ? `${BACKEND_URL}/api/discovery?${qs}`
+    : `${BACKEND_URL}/api/discovery`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !Array.isArray(data.jobs)) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    jobs: data.jobs as AiDiscoveryJobSummary[],
+    count: typeof data.count === "number" ? data.count : data.jobs.length,
+  };
+}
