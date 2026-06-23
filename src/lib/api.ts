@@ -572,3 +572,190 @@ export async function listAiDiscoveryJobs(
     count: typeof data.count === "number" ? data.count : data.jobs.length,
   };
 }
+
+/* ------------------------------------------------------------------ */
+/* AI requirements job API (Step 9f-5 — types + wrappers only, no UI  */
+/* wiring).                                                            */
+/* ------------------------------------------------------------------ */
+
+export type AiRequirementsJobStatus =
+  | "queued"
+  | "running"
+  | "succeeded"
+  | "failed";
+
+/**
+ * Permissive answer-value union. Matches the backend Answer schema
+ * (src/engine/schemas/answers.ts) and what DiscoveryQuestionnaire stores
+ * locally per question type:
+ *   single_select → string
+ *   multi_select  → string[]
+ *   number        → number
+ *   boolean       → boolean
+ *   text          → string
+ *   skipped       → null
+ */
+export type AiAnswerValue = string | string[] | number | boolean | null;
+
+export type AiAnswer = {
+  questionId: string;
+  value: AiAnswerValue;
+};
+
+export type AiRequirementsJobSummary = {
+  id: string;
+  aiDiscoveryJobId: string;
+  status: AiRequirementsJobStatus;
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  /**
+   * Server-suggested polling URL. Informational only — the wrappers call
+   * by job id against BACKEND_URL so a misconfigured backend can't
+   * redirect us off-origin.
+   */
+  pollUrl: string;
+};
+
+export type AiRequirementsJobDetail = AiRequirementsJobSummary & {
+  /**
+   * Answers payload the dashboard submitted. The backend serializer
+   * returns whatever shape was stored in Postgres; typed permissively
+   * so consumers can opt into the `AiAnswer[]` narrow when they know
+   * they wrote it.
+   */
+  answers: AiAnswer[] | unknown;
+  requirements: unknown | null;
+  errorMessage: string | null;
+};
+
+export type CreateAiRequirementsJobInput = {
+  answers: AiAnswer[];
+};
+
+export type CreateAiRequirementsJobResponse = {
+  success: true;
+  job: AiRequirementsJobSummary;
+};
+
+export type GetAiRequirementsJobResponse = {
+  success: true;
+  job: AiRequirementsJobDetail;
+};
+
+export type ListAiRequirementsJobsOptions = {
+  limit?: number;
+  status?: AiRequirementsJobStatus;
+  discoveryId?: string;
+};
+
+export type ListAiRequirementsJobsResponse = {
+  success: true;
+  jobs: AiRequirementsJobSummary[];
+  count: number;
+};
+
+/**
+ * POST /api/discovery/:discoveryId/requirements — create + enqueue an AI
+ * requirements job that turns discovery answers into normalized
+ * Requirements JSON. Returns the summary (no requirements payload yet).
+ * Caller should then poll getAiRequirementsJob(idToken, summary.id)
+ * until status is "succeeded" or "failed". Once succeeded, the dashboard
+ * can take detail.requirements and POST it to /api/jobs to start an
+ * architecture run.
+ */
+export async function createAiRequirementsJob(
+  idToken: string,
+  discoveryId: string,
+  input: CreateAiRequirementsJobInput
+): Promise<CreateAiRequirementsJobResponse> {
+  const res = await fetch(
+    `${BACKEND_URL}/api/discovery/${encodeURIComponent(
+      discoveryId
+    )}/requirements`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(input),
+    }
+  );
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    job: data.job as AiRequirementsJobSummary,
+  };
+}
+
+/**
+ * GET /api/requirements/:id — fetch the latest snapshot of a single
+ * requirements job. The detail shape includes the answers payload the
+ * dashboard submitted and the normalized requirements payload once the
+ * worker has succeeded.
+ */
+export async function getAiRequirementsJob(
+  idToken: string,
+  jobId: string
+): Promise<GetAiRequirementsJobResponse> {
+  const res = await fetch(
+    `${BACKEND_URL}/api/requirements/${encodeURIComponent(jobId)}`,
+    {
+      method: "GET",
+      headers: { Authorization: `Bearer ${idToken}` },
+    }
+  );
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !data.job) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    job: data.job as AiRequirementsJobDetail,
+  };
+}
+
+/**
+ * GET /api/requirements — list the caller's recent requirements jobs.
+ * Server caps at limit=50 and defaults to 20. Summaries omit the
+ * answers + requirements + errorMessage payloads by design; call
+ * getAiRequirementsJob for the full detail when needed.
+ */
+export async function listAiRequirementsJobs(
+  idToken: string,
+  options?: ListAiRequirementsJobsOptions
+): Promise<ListAiRequirementsJobsResponse> {
+  const params = new URLSearchParams();
+  if (options?.limit !== undefined) {
+    params.set("limit", String(options.limit));
+  }
+  if (options?.status !== undefined) {
+    params.set("status", options.status);
+  }
+  if (options?.discoveryId !== undefined) {
+    params.set("discoveryId", options.discoveryId);
+  }
+  const qs = params.toString();
+  const url = qs
+    ? `${BACKEND_URL}/api/requirements?${qs}`
+    : `${BACKEND_URL}/api/requirements`;
+  const res = await fetch(url, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${idToken}` },
+  });
+  const data = await readJsonSafe(res);
+  if (!res.ok || !data.success || !Array.isArray(data.jobs)) {
+    throw new Error(bubbleError(data, res));
+  }
+  return {
+    success: true,
+    jobs: data.jobs as AiRequirementsJobSummary[],
+    count: typeof data.count === "number" ? data.count : data.jobs.length,
+  };
+}
