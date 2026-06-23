@@ -2099,6 +2099,165 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Discovery result preview — read-only summary + question list shown
+ * beneath .ai-panel once a discovery job succeeds. Uses existing tokens
+ * and visual language; no new design.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.discovery-result {
+  margin-top: var(--space-12);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  animation: notice-in 240ms var(--ease-spring) both;
+}
+
+.discovery-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+}
+
+.discovery-result-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-10);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.discovery-result-eyebrow-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(239, 111, 46, 0.15);
+}
+
+.discovery-result-reset {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out);
+}
+
+.discovery-result-reset:hover {
+  color: var(--text-primary);
+  background: var(--gray-50);
+}
+
+.discovery-result-summary {
+  font-size: 14.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  letter-spacing: -0.003em;
+  margin: 0;
+}
+
+.discovery-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.discovery-result-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-50);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+}
+
+.discovery-result-meta-chip strong {
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+.discovery-result-questions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.discovery-result-question {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: baseline;
+  gap: var(--space-12);
+  padding: var(--space-12) 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.discovery-result-question:first-child {
+  border-top: 0;
+  padding-top: var(--space-4);
+}
+
+.discovery-result-question-index {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+}
+
+.discovery-result-question-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.discovery-result-question-cat {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.discovery-result-empty {
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 0;
+}
+
+/* Inline spinner used inside .btn-primary while a discovery job is in
+ * flight. Reuses splash-spin keyframes defined earlier in this file. */
+.discovery-inline-spinner {
+  display: inline-block;
+  border-radius: 50%;
+  border: 1.4px solid rgba(255, 255, 255, 0.32);
+  border-top-color: #ffffff;
+  animation: splash-spin 720ms linear infinite;
+  flex-shrink: 0;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Section grid + cards
  * ═════════════════════════════════════════════════════════════════════════ */
 .section-row {

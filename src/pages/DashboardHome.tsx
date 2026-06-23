@@ -11,9 +11,15 @@ import {
 
 type Props = {
   firstName: string;
+  /**
+   * Resolves a fresh Firebase ID token from the authenticated session.
+   * Provided by App.tsx via the AuthGate `fbUser`. Calls into discovery API
+   * wrappers are token-gated and must never store the token locally.
+   */
+  getIdToken: () => Promise<string>;
 };
 
-export default function DashboardHome({ firstName }: Props) {
+export default function DashboardHome({ firstName, getIdToken }: Props) {
   const greeting = useMemo(() => greetingFor(new Date()), []);
 
   return (
@@ -21,7 +27,7 @@ export default function DashboardHome({ firstName }: Props) {
       <Hero firstName={firstName} greeting={greeting} />
 
       <section className="home-block">
-        <AiInputPanel />
+        <AiInputPanel getIdToken={getIdToken} />
       </section>
 
       <RecentActivity />

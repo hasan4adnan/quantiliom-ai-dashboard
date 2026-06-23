@@ -107,7 +107,10 @@ function renderPage(args: {
   const { route, param, navigate, email, fbUser, localUser, onSignOut } = args;
   if (route === "home") {
     return (
-      <DashboardHome firstName={firstNameFrom(deriveDisplayName(fbUser, localUser))} />
+      <DashboardHome
+        firstName={firstNameFrom(deriveDisplayName(fbUser, localUser))}
+        getIdToken={() => fbUser.getIdToken()}
+      />
     );
   }
   if (route === "projects") return <ProjectsPage onNavigate={navigate} />;
