@@ -2798,6 +2798,480 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Architecture workspace (Step 9i) — internal workspace layout.
+ *
+ * Lives inside the existing dashboard shell (Sidebar + Topbar stay
+ * visible). Reuses the .discovery-quest-shell card patterns, .meta-rule
+ * spacing, .wiz-btn buttons, and existing chips/tokens — the workspace
+ * is meant to feel native, not like a separate product.
+ *
+ * Layout: [rail] [board] [chat-panel]. On <= 1100px the chat-panel
+ * stacks under the board. On <= 720px the rail collapses to icons only
+ * and sits horizontally.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.workspace-shell {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr) minmax(280px, 320px);
+  gap: var(--space-20);
+  align-items: stretch;
+  margin-top: var(--space-8);
+}
+
+.workspace-shell:has(.workspace-rail--collapsed) {
+  grid-template-columns: 64px minmax(0, 1fr) minmax(280px, 320px);
+}
+
+/* ── Workspace rail ───────────────────────────────────────────────── */
+.workspace-rail {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-12);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  min-height: 220px;
+  align-self: flex-start;
+  transition: padding var(--dur-base) var(--ease-out);
+  position: sticky;
+  top: var(--space-12);
+}
+
+.workspace-rail--collapsed {
+  padding: var(--space-8);
+}
+
+.workspace-rail-toggle {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: var(--space-6) var(--space-10);
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+  color: var(--text-secondary);
+  font: var(--weight-medium) 11.5px / 1.2 var(--font-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.workspace-rail-toggle:hover {
+  background: var(--gray-50);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.workspace-rail-toggle-glyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.workspace-rail-toggle-label {
+  overflow: hidden;
+  white-space: nowrap;
+  transition: opacity var(--dur-base) var(--ease-out),
+    max-width var(--dur-base) var(--ease-out);
+  max-width: 140px;
+  opacity: 1;
+}
+
+.workspace-rail--collapsed .workspace-rail-toggle {
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.workspace-rail--collapsed .workspace-rail-toggle-label {
+  max-width: 0;
+  opacity: 0;
+}
+
+.workspace-rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+}
+
+.workspace-rail-item {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-10);
+  display: flex;
+  align-items: center;
+  gap: var(--space-10);
+  color: var(--text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out);
+}
+
+.workspace-rail-item:hover:not(:disabled) {
+  background: var(--gray-50);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.workspace-rail-item--active {
+  background: var(--surface-inset);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.workspace-rail-item--disabled,
+.workspace-rail-item:disabled {
+  cursor: not-allowed;
+  color: var(--text-muted);
+  opacity: 0.72;
+}
+
+.workspace-rail-item-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-md);
+  background: var(--gray-100);
+  font: var(--weight-semibold) 12px / 1 var(--font-mono);
+  letter-spacing: 0;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.workspace-rail-item--active .workspace-rail-item-mark {
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+}
+
+.workspace-rail-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  overflow: hidden;
+  transition: max-width var(--dur-base) var(--ease-out),
+    opacity var(--dur-base) var(--ease-out);
+  max-width: 220px;
+  opacity: 1;
+}
+
+.workspace-rail--collapsed .workspace-rail-item-body {
+  max-width: 0;
+  opacity: 0;
+}
+
+.workspace-rail-item-label {
+  font-size: 13.5px;
+  font-weight: var(--weight-medium);
+  line-height: 1.2;
+}
+
+.workspace-rail-item-hint {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+/* ── Workspace main board ─────────────────────────────────────────── */
+.workspace-main {
+  min-width: 0;
+}
+
+.workspace-board {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+}
+
+.workspace-board-empty {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.workspace-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding-bottom: var(--space-16);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.workspace-board-title {
+  font-size: 26px;
+  line-height: 1.2;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.workspace-board-sub {
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 72ch;
+}
+
+.workspace-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.workspace-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.workspace-pattern-text {
+  margin: 0;
+  font-size: 15.5px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.workspace-component-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-10);
+}
+
+.workspace-component-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-14);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.workspace-component-card:hover {
+  border-color: var(--border-strong);
+}
+
+.workspace-component-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.workspace-component-name {
+  font-size: 14.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.workspace-component-cat {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.workspace-component-role {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.workspace-component-tech {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.workspace-component-tech-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-8);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--gray-50);
+  color: var(--text-secondary);
+}
+
+/* ── Workspace chat (Copilot placeholder) ─────────────────────────── */
+.workspace-chat-panel {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-14);
+  align-self: flex-start;
+  position: sticky;
+  top: var(--space-12);
+  min-height: 320px;
+}
+
+.workspace-chat-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-bottom: var(--space-12);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.workspace-chat-title {
+  margin: 0;
+  font-size: 17px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.workspace-chat-sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.workspace-chat-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.workspace-chat-chip {
+  appearance: none;
+  padding: var(--space-6) var(--space-10);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-pill);
+  background: var(--gray-50);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.workspace-chat-input {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+  margin-top: auto;
+}
+
+.workspace-chat-textarea {
+  appearance: none;
+  resize: none;
+  width: 100%;
+  padding: var(--space-10);
+  font: var(--weight-regular) 13.5px / 1.5 var(--font-sans);
+  color: var(--text-muted);
+  background: var(--gray-50);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  cursor: not-allowed;
+}
+
+.workspace-chat-input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-10);
+}
+
+.workspace-chat-input-note {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+/* ── Empty workspace ──────────────────────────────────────────────── */
+.workspace-empty {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-28);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  max-width: 640px;
+  margin: var(--space-16) auto;
+}
+
+@media (max-width: 1100px) {
+  .workspace-shell,
+  .workspace-shell:has(.workspace-rail--collapsed) {
+    grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  }
+  .workspace-shell:has(.workspace-rail--collapsed) {
+    grid-template-columns: 64px minmax(0, 1fr);
+  }
+  .workspace-chat-panel {
+    grid-column: 1 / -1;
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-shell,
+  .workspace-shell:has(.workspace-rail--collapsed) {
+    grid-template-columns: 1fr;
+  }
+  .workspace-rail {
+    flex-direction: row;
+    overflow-x: auto;
+    position: static;
+    min-height: 0;
+  }
+  .workspace-rail-nav {
+    flex-direction: row;
+    margin-top: 0;
+  }
+  .workspace-rail-item-body {
+    max-width: none;
+  }
+  .workspace-board {
+    padding: var(--space-16);
+  }
+  .workspace-board-title {
+    font-size: 22px;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Section grid + cards
  * ═════════════════════════════════════════════════════════════════════════ */
 .section-row {

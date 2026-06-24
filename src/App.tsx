@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import AuthGate from "./components/AuthGate";
 import PageTransition from "./components/PageTransition";
 import Sidebar from "./components/Sidebar";
@@ -11,6 +11,9 @@ import AccountPage from "./pages/AccountPage";
 import SettingsPage from "./pages/SettingsPage";
 import TermsPage from "./pages/TermsPage";
 import PrivacyPage from "./pages/PrivacyPage";
+import ArchitectureWorkspace, {
+  type WorkspaceState,
+} from "./pages/ArchitectureWorkspace";
 import { useRoute, type Route } from "./lib/router";
 import type { LocalUser } from "./lib/api";
 import { auth, signOut, type User } from "./lib/firebase";
@@ -77,8 +80,12 @@ function ComingSoonPage({ route, onBack }: { route: Route; onBack: () => void })
 
 // Routes that should keep a different sidebar item active (e.g. /#upgrade
 // is a sub-flow of Subscription, not its own top-level destination).
+// The architecture workspace is opened from the Home flow and isn't a
+// top-level destination, so keep Home highlighted while the user is
+// inside it.
 const SIDEBAR_ACTIVE: Partial<Record<Route, Route>> = {
   upgrade: "subscription",
+  workspace: "home",
 };
 
 function firstNameFrom(displayName: string): string {
@@ -103,13 +110,34 @@ function renderPage(args: {
   fbUser: User;
   localUser: LocalUser;
   onSignOut: () => void;
+  workspaceState: WorkspaceState | null;
+  onOpenArchitectureWorkspace: (state: WorkspaceState) => void;
 }) {
-  const { route, param, navigate, email, fbUser, localUser, onSignOut } = args;
+  const {
+    route,
+    param,
+    navigate,
+    email,
+    fbUser,
+    localUser,
+    onSignOut,
+    workspaceState,
+    onOpenArchitectureWorkspace,
+  } = args;
   if (route === "home") {
     return (
       <DashboardHome
         firstName={firstNameFrom(deriveDisplayName(fbUser, localUser))}
         getIdToken={() => fbUser.getIdToken()}
+        onOpenArchitectureWorkspace={onOpenArchitectureWorkspace}
+      />
+    );
+  }
+  if (route === "workspace") {
+    return (
+      <ArchitectureWorkspace
+        state={workspaceState}
+        onBackToHome={() => navigate("home")}
       />
     );
   }
@@ -138,6 +166,21 @@ function renderPage(args: {
 function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
   const [navOpen, setNavOpen] = useState(false);
   const { route, param, navigate } = useRoute();
+  // Workspace state is intentionally in-memory only: a refresh clears
+  // it and ArchitectureWorkspace falls back to the empty card. We do
+  // NOT persist this (no localStorage/sessionStorage, no URL params) so
+  // a stale or tampered architecture payload can't survive a reload.
+  const [workspaceState, setWorkspaceState] = useState<WorkspaceState | null>(
+    null
+  );
+
+  const openArchitectureWorkspace = useCallback(
+    (state: WorkspaceState) => {
+      setWorkspaceState(state);
+      navigate("workspace");
+    },
+    [navigate]
+  );
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 901px)");
@@ -205,6 +248,8 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
                 fbUser,
                 localUser,
                 onSignOut: handleSignOut,
+                workspaceState,
+                onOpenArchitectureWorkspace: openArchitectureWorkspace,
               })}
             </PageTransition>
           </div>

@@ -31,7 +31,8 @@ export type Route =
   | "account"
   | "settings"
   | "terms"
-  | "privacy";
+  | "privacy"
+  | "workspace";
 
 const ROUTES: readonly Route[] = [
   "home",
@@ -45,6 +46,7 @@ const ROUTES: readonly Route[] = [
   "settings",
   "terms",
   "privacy",
+  "workspace",
 ];
 
 type ParsedHash = { route: Route; param: string | null };

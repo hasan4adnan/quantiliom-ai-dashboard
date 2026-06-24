@@ -35,6 +35,7 @@ import {
   type AiQuestion,
   type RequirementAnalysis,
 } from "../lib/api";
+import type { WorkspaceState } from "./ArchitectureWorkspace";
 
 const POLL_INTERVAL_MS = 3000;
 const MAX_POLL_ATTEMPTS = 60;
@@ -107,6 +108,14 @@ type Props = {
    * token-gated and must never store the token locally.
    */
   getIdToken: () => Promise<string>;
+  /**
+   * Hand the freshly-generated architecture (plus the discovery /
+   * requirements context that produced it) up to App.Shell so it can
+   * stash workspaceState and navigate to "#workspace". Optional — when
+   * absent, ArchitecturePreview's "Open architecture workspace" button
+   * stays disabled and the user can still review the compact preview.
+   */
+  onOpenArchitectureWorkspace?: (state: WorkspaceState) => void;
 };
 
 function safeErrorMessage(err: unknown, fallback: string): string {
@@ -117,7 +126,11 @@ function safeErrorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
-export default function DashboardHome({ firstName, getIdToken }: Props) {
+export default function DashboardHome({
+  firstName,
+  getIdToken,
+  onOpenArchitectureWorkspace,
+}: Props) {
   const greeting = useMemo(() => greetingFor(new Date()), []);
   const [brief, setBrief] = useState("");
   const [phase, setPhase] = useState<Phase>({ kind: "brief" });
@@ -574,6 +587,20 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
     });
   }, [phase, stopPolling]);
 
+  const handleOpenWorkspace = useCallback(() => {
+    if (phase.kind !== "architecture-ready") return;
+    if (!onOpenArchitectureWorkspace) return;
+    onOpenArchitectureWorkspace({
+      architecture: phase.architecture,
+      brief: phase.description,
+      requirements: phase.requirements,
+      discoveryJobId: phase.discoveryId,
+      requirementsJobId: phase.requirementsJobId,
+      architectureJobId: phase.architectureJobId,
+      openedAt: new Date().toISOString(),
+    });
+  }, [phase, onOpenArchitectureWorkspace]);
+
   const handleRetryArchitecture = useCallback(() => {
     if (phase.kind !== "architecture-error") return;
     void startArchitectureSubmission({
@@ -672,6 +699,9 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
           architecture={phase.architecture}
           onBackToRequirements={handleBackToRequirements}
           onStartOver={handleReset}
+          onOpenWorkspace={
+            onOpenArchitectureWorkspace ? handleOpenWorkspace : undefined
+          }
         />
       </DiscoveryFlowFrame>
     );

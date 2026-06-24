@@ -13,6 +13,12 @@ type Props = {
   architecture: unknown;
   onBackToRequirements: () => void;
   onStartOver: () => void;
+  /**
+   * Called when the user clicks "Open architecture workspace". The
+   * parent owns workspace state + navigation so this component stays
+   * presentational. When omitted, the button stays disabled.
+   */
+  onOpenWorkspace?: () => void;
 };
 
 function asObject(v: unknown): Record<string, unknown> | null {
@@ -132,8 +138,10 @@ export default function ArchitecturePreview({
   architecture,
   onBackToRequirements,
   onStartOver,
+  onOpenWorkspace,
 }: Props) {
   const arch = asObject(architecture);
+  const canOpenWorkspace = !!onOpenWorkspace && !!arch;
 
   if (!arch) {
     return (
@@ -423,14 +431,21 @@ export default function ArchitecturePreview({
         </div>
         <div className="discovery-final-cluster">
           <span className="discovery-final-note">
-            The full workspace view will be connected in the next step.
+            {canOpenWorkspace
+              ? "Open the workspace to explore components, decisions, and trade-offs."
+              : "The full workspace view will be connected in the next step."}
           </span>
           <button
             type="button"
             className="wiz-btn wiz-btn-dark"
-            disabled
-            aria-disabled="true"
-            title="Coming next: open the architecture workspace with diagram, cost, and alternatives."
+            onClick={canOpenWorkspace ? onOpenWorkspace : undefined}
+            disabled={!canOpenWorkspace}
+            aria-disabled={!canOpenWorkspace}
+            title={
+              canOpenWorkspace
+                ? "Open the architecture workspace."
+                : "Architecture is not available yet."
+            }
           >
             Open architecture workspace →
           </button>
