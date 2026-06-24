@@ -9,6 +9,8 @@ import {
   type SVGProps,
 } from "react";
 import AiInputPanel from "../components/AiInputPanel";
+import ArchitectureLoadingPanel from "../components/ArchitectureLoadingPanel";
+import ArchitecturePreview from "../components/ArchitecturePreview";
 import DiscoveryLoadingPanel from "../components/DiscoveryLoadingPanel";
 import DiscoveryQuestionnaire from "../components/DiscoveryQuestionnaire";
 import RequirementsLoadingPanel from "../components/RequirementsLoadingPanel";
@@ -23,8 +25,10 @@ import {
 } from "../components/icons";
 import {
   createAiDiscoveryJob,
+  createAiJob,
   createAiRequirementsJob,
   getAiDiscoveryJob,
+  getAiJob,
   getAiRequirementsJob,
   type AiAnswer,
   type AiAnswerValue,
@@ -41,6 +45,17 @@ type DiscoveryContext = {
   discoveryId: string;
   analysis: RequirementAnalysis | null;
   questions: AiQuestion[];
+};
+
+/**
+ * Everything we know once the requirements job has succeeded — used as
+ * the base context for architecture phases so they keep a path back to
+ * requirements/questions/brief.
+ */
+type RequirementsContext = DiscoveryContext & {
+  answers: AiAnswer[];
+  requirementsJobId: string;
+  requirements: Record<string, unknown>;
 };
 
 type Phase =
@@ -69,7 +84,20 @@ type Phase =
       kind: "requirements-error";
       answers: AiAnswer[];
       message: string;
-    } & DiscoveryContext);
+    } & DiscoveryContext)
+  | ({
+      kind: "architecture-loading";
+      architectureJobId: string | null;
+    } & RequirementsContext)
+  | ({
+      kind: "architecture-ready";
+      architectureJobId: string;
+      architecture: unknown;
+    } & RequirementsContext)
+  | ({
+      kind: "architecture-error";
+      message: string;
+    } & RequirementsContext);
 
 type Props = {
   firstName: string;
@@ -399,6 +427,166 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
     );
   }, [phase, startRequirementsSubmission]);
 
+  /* ── Architecture phase ─────────────────────────────────────────── */
+
+  const pollArchitectureOnce = useCallback(
+    async (ctx: RequirementsContext, archJobId: string) => {
+      if (cancelledRef.current) return;
+      try {
+        const idToken = await getIdToken();
+        const job = await getAiJob(idToken, archJobId);
+        if (cancelledRef.current) return;
+
+        if (job.status === "succeeded") {
+          const result = job.result;
+          if (!result || typeof result !== "object" || Array.isArray(result)) {
+            setPhase({
+              kind: "architecture-error",
+              ...ctx,
+              message:
+                "Architecture generation finished but the result was empty. Try again.",
+            });
+          } else {
+            setPhase({
+              kind: "architecture-ready",
+              ...ctx,
+              architectureJobId: archJobId,
+              architecture: result,
+            });
+          }
+          stopPolling();
+          return;
+        }
+        if (job.status === "failed") {
+          setPhase({
+            kind: "architecture-error",
+            ...ctx,
+            message:
+              "We couldn't generate an architecture from those requirements. Try again or edit your answers.",
+          });
+          stopPolling();
+          return;
+        }
+
+        attemptRef.current += 1;
+        if (attemptRef.current >= MAX_POLL_ATTEMPTS) {
+          setPhase({
+            kind: "architecture-error",
+            ...ctx,
+            message:
+              "Generating the architecture is taking longer than expected. Try again in a moment.",
+          });
+          stopPolling();
+          return;
+        }
+
+        timerRef.current = window.setTimeout(() => {
+          void pollArchitectureOnce(ctx, archJobId);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "architecture-error",
+          ...ctx,
+          message: safeErrorMessage(
+            err,
+            "We couldn't reach the architecture service. Try again."
+          ),
+        });
+        stopPolling();
+      }
+    },
+    [getIdToken, stopPolling]
+  );
+
+  const startArchitectureSubmission = useCallback(
+    async (ctx: RequirementsContext) => {
+      stopPolling();
+      setPhase({
+        kind: "architecture-loading",
+        ...ctx,
+        architectureJobId: null,
+      });
+      try {
+        const idToken = await getIdToken();
+        const summary = await createAiJob(idToken, {
+          description: ctx.description,
+          requirements: ctx.requirements,
+        });
+        if (cancelledRef.current) return;
+        attemptRef.current = 0;
+        setPhase({
+          kind: "architecture-loading",
+          ...ctx,
+          architectureJobId: summary.id,
+        });
+        timerRef.current = window.setTimeout(() => {
+          void pollArchitectureOnce(ctx, summary.id);
+        }, POLL_INTERVAL_MS);
+      } catch (err) {
+        if (cancelledRef.current) return;
+        setPhase({
+          kind: "architecture-error",
+          ...ctx,
+          message: safeErrorMessage(
+            err,
+            "We couldn't start architecture generation. Try again."
+          ),
+        });
+      }
+    },
+    [getIdToken, pollArchitectureOnce, stopPolling]
+  );
+
+  const handleGenerateArchitecture = useCallback(() => {
+    if (phase.kind !== "requirements-ready") return;
+    const req = phase.requirements;
+    if (!req || typeof req !== "object" || Array.isArray(req)) return;
+    void startArchitectureSubmission({
+      description: phase.description,
+      discoveryId: phase.discoveryId,
+      analysis: phase.analysis,
+      questions: phase.questions,
+      answers: phase.answers,
+      requirementsJobId: phase.requirementsJobId,
+      requirements: req as Record<string, unknown>,
+    });
+  }, [phase, startArchitectureSubmission]);
+
+  const handleBackToRequirements = useCallback(() => {
+    if (
+      phase.kind !== "architecture-loading" &&
+      phase.kind !== "architecture-ready" &&
+      phase.kind !== "architecture-error"
+    ) {
+      return;
+    }
+    stopPolling();
+    setPhase({
+      kind: "requirements-ready",
+      description: phase.description,
+      discoveryId: phase.discoveryId,
+      analysis: phase.analysis,
+      questions: phase.questions,
+      answers: phase.answers,
+      requirementsJobId: phase.requirementsJobId,
+      requirements: phase.requirements,
+    });
+  }, [phase, stopPolling]);
+
+  const handleRetryArchitecture = useCallback(() => {
+    if (phase.kind !== "architecture-error") return;
+    void startArchitectureSubmission({
+      description: phase.description,
+      discoveryId: phase.discoveryId,
+      analysis: phase.analysis,
+      questions: phase.questions,
+      answers: phase.answers,
+      requirementsJobId: phase.requirementsJobId,
+      requirements: phase.requirements,
+    });
+  }, [phase, startArchitectureSubmission]);
+
   const initialAnswersMap = useMemo<
     Record<string, AiAnswerValue> | undefined
   >(() => {
@@ -453,6 +641,7 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
           requirements={phase.requirements}
           onBackToQuestions={handleBackToQuestions}
           onStartOver={handleReset}
+          onGenerateArchitecture={handleGenerateArchitecture}
         />
       </DiscoveryFlowFrame>
     );
@@ -464,6 +653,36 @@ export default function DashboardHome({ firstName, getIdToken }: Props) {
           message={phase.message}
           onRetry={handleRetryRequirements}
           onBackToQuestions={handleBackToQuestions}
+          onReset={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "architecture-loading") {
+    return (
+      <DiscoveryFlowFrame>
+        <ArchitectureLoadingPanel onCancel={handleReset} />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "architecture-ready") {
+    return (
+      <DiscoveryFlowFrame>
+        <ArchitecturePreview
+          architecture={phase.architecture}
+          onBackToRequirements={handleBackToRequirements}
+          onStartOver={handleReset}
+        />
+      </DiscoveryFlowFrame>
+    );
+  }
+  if (phase.kind === "architecture-error") {
+    return (
+      <DiscoveryFlowFrame>
+        <ArchitectureErrorPanel
+          message={phase.message}
+          onRetry={handleRetryArchitecture}
+          onBackToRequirements={handleBackToRequirements}
           onReset={handleReset}
         />
       </DiscoveryFlowFrame>
@@ -545,6 +764,56 @@ function RequirementsErrorPanel({
             onClick={onBackToQuestions}
           >
             ← Back to questions
+          </button>
+        </div>
+        <button
+          type="button"
+          className="wiz-btn wiz-btn-dark"
+          onClick={onRetry}
+        >
+          Try again →
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ArchitectureErrorPanel({
+  message,
+  onRetry,
+  onBackToRequirements,
+  onReset,
+}: {
+  message: string;
+  onRetry: () => void;
+  onBackToRequirements: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <div className="discovery-error-card" role="alert">
+      <div className="discovery-flow-eyebrow">
+        <span className="discovery-flow-eyebrow-dot" aria-hidden="true" />
+        Architecture
+      </div>
+      <h2 className="discovery-flow-title">
+        We couldn&rsquo;t generate the architecture
+      </h2>
+      <p className="discovery-flow-sub">{message}</p>
+      <div className="discovery-flow-foot discovery-flow-foot-split">
+        <div className="discovery-flow-foot-left">
+          <button
+            type="button"
+            className="wiz-btn wiz-btn-ghost"
+            onClick={onReset}
+          >
+            Start over
+          </button>
+          <button
+            type="button"
+            className="wiz-btn wiz-btn-ghost"
+            onClick={onBackToRequirements}
+          >
+            ← Back to requirements
           </button>
         </div>
         <button

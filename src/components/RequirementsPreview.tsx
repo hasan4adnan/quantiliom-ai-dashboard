@@ -12,6 +12,18 @@ type Props = {
   requirements: unknown;
   onBackToQuestions: () => void;
   onStartOver: () => void;
+  /**
+   * Called when the user clicks "Generate architecture". The parent owns
+   * the POST to /api/jobs + polling so this component stays purely
+   * presentational. When omitted, the button stays disabled.
+   */
+  onGenerateArchitecture?: () => void;
+  /**
+   * Set true while the architecture request is in flight (or about to
+   * be). When true, the button shows a busy label and is non-interactive
+   * to prevent duplicate submissions.
+   */
+  isGenerating?: boolean;
 };
 
 function asObject(v: unknown): Record<string, unknown> | null {
@@ -110,8 +122,11 @@ export default function RequirementsPreview({
   requirements,
   onBackToQuestions,
   onStartOver,
+  onGenerateArchitecture,
+  isGenerating = false,
 }: Props) {
   const req = asObject(requirements);
+  const canGenerate = !!onGenerateArchitecture && !!req && !isGenerating;
 
   if (!req) {
     return (
@@ -241,16 +256,25 @@ export default function RequirementsPreview({
         </div>
         <div className="discovery-final-cluster">
           <span className="discovery-final-note">
-            Architecture generation will be connected in the next step.
+            {isGenerating
+              ? "Sending requirements to the architecture pipeline."
+              : "We'll synthesize a system architecture from these requirements."}
           </span>
           <button
             type="button"
             className="wiz-btn wiz-btn-dark"
-            disabled
-            aria-disabled="true"
-            title="Coming next: send these requirements to the architecture pipeline."
+            onClick={canGenerate ? onGenerateArchitecture : undefined}
+            disabled={!canGenerate}
+            aria-disabled={!canGenerate}
+            title={
+              canGenerate
+                ? "Send these requirements to the architecture pipeline."
+                : isGenerating
+                ? "Architecture generation in progress."
+                : "Architecture generation is not available right now."
+            }
           >
-            Generate architecture →
+            {isGenerating ? "Generating…" : "Generate architecture →"}
           </button>
         </div>
       </div>
