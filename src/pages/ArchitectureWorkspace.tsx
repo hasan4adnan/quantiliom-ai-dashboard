@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ArchitectureBoard from "../components/ArchitectureBoard";
+import TechStackBoard from "../components/TechStackBoard";
 import WorkspaceChatPanel from "../components/WorkspaceChatPanel";
 import WorkspaceRail, { type RailItemKey } from "../components/WorkspaceRail";
 
@@ -28,15 +29,31 @@ type Props = {
 /**
  * The architecture workspace is a STANDALONE full-viewport surface
  * rendered ABOVE the dashboard shell — the main Sidebar and Topbar are
- * not present here. It carries its own minimal brand header + back-to-
- * dashboard action and dedicates the rest of the viewport to the
- * Architecture board (with a workspace rail on the left and an optional
- * Copilot placeholder on the right). On narrower screens the Copilot
- * column collapses below the board so the board itself stays the
- * largest, most readable surface.
+ * not present here.
+ *
+ * Step 9o layout changes:
+ *   - The body is now a two-column grid (rail | main). Copilot no
+ *     longer reserves a right column; it opens from a small "Copilot"
+ *     toggle in the standalone header into a fixed drawer that
+ *     overlays the right edge, so the centre column always gets the
+ *     full available width.
+ *   - The rail switches between two internal sections: Architecture
+ *     (diagram canvas) and Tech Stack (grouped technology cards).
  */
 export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
-  const [activeTab, setActiveTab] = useState<RailItemKey>("architecture");
+  const [activeSection, setActiveSection] = useState<RailItemKey>("architecture");
+  const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+
+  // Escape closes the drawer — standard dialog convention. Only wired
+  // when the drawer is open so we don't keep a listener around forever.
+  useEffect(() => {
+    if (!isCopilotOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setIsCopilotOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isCopilotOpen]);
 
   return (
     <div className="workspace-standalone" aria-label="Architecture workspace">
@@ -54,13 +71,32 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
             </span>
           </div>
         </div>
-        <button
-          type="button"
-          className="wiz-btn wiz-btn-ghost"
-          onClick={onBackToHome}
-        >
-          ← Back to dashboard
-        </button>
+        <div className="workspace-standalone-actions">
+          {state ? (
+            <button
+              type="button"
+              className={`workspace-copilot-toggle${
+                isCopilotOpen ? " is-open" : ""
+              }`}
+              aria-expanded={isCopilotOpen}
+              aria-controls="workspace-copilot-drawer"
+              onClick={() => setIsCopilotOpen((v) => !v)}
+            >
+              <span
+                className="workspace-copilot-toggle-dot"
+                aria-hidden="true"
+              />
+              Copilot
+            </button>
+          ) : null}
+          <button
+            type="button"
+            className="wiz-btn wiz-btn-ghost"
+            onClick={onBackToHome}
+          >
+            ← Back to dashboard
+          </button>
+        </div>
       </header>
 
       {!state ? (
@@ -94,16 +130,51 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
         </main>
       ) : (
         <div className="workspace-standalone-body">
-          <WorkspaceRail activeKey={activeTab} onSelect={setActiveTab} />
+          <WorkspaceRail activeKey={activeSection} onSelect={setActiveSection} />
           <main className="workspace-standalone-main">
-            <ArchitectureBoard
-              architecture={state.architecture}
-              brief={state.brief}
-            />
+            {activeSection === "architecture" ? (
+              <ArchitectureBoard
+                architecture={state.architecture}
+                brief={state.brief}
+              />
+            ) : (
+              <TechStackBoard architecture={state.architecture} />
+            )}
           </main>
-          <WorkspaceChatPanel />
         </div>
       )}
+
+      {isCopilotOpen ? (
+        <>
+          <div
+            className="workspace-copilot-backdrop"
+            aria-hidden="true"
+            onClick={() => setIsCopilotOpen(false)}
+          />
+          <aside
+            id="workspace-copilot-drawer"
+            className="workspace-copilot-drawer"
+            role="dialog"
+            aria-modal="false"
+            aria-label="Architecture Copilot"
+          >
+            <header className="workspace-copilot-drawer-head">
+              <span className="workspace-copilot-drawer-title">Copilot</span>
+              <button
+                type="button"
+                className="workspace-copilot-drawer-close"
+                aria-label="Close copilot"
+                onClick={() => setIsCopilotOpen(false)}
+              >
+                ×
+              </button>
+            </header>
+            <div className="workspace-copilot-drawer-body">
+              <WorkspaceChatPanel />
+            </div>
+          </aside>
+        </>
+      ) : null}
     </div>
   );
 }

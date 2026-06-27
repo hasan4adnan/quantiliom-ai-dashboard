@@ -3,19 +3,22 @@ import { useState } from "react";
 /**
  * Compact collapsible rail for the internal architecture workspace.
  *
- * Sits to the left of the workspace main panel, INSIDE the existing
- * dashboard shell (so the main Sidebar/Topbar stay visible). The rail
- * intentionally has no avatar, plan card, or branding so it doesn't
- * compete with the main Sidebar — it's a workspace navigator, not a
- * second product sidebar.
+ * Sits to the left of the workspace main panel inside the standalone
+ * workspace shell. The rail intentionally has no avatar, plan card, or
+ * branding so it doesn't compete with the main Sidebar — it's a
+ * workspace navigator, not a second product sidebar.
  *
- * Today the rail has exactly one active item (Architecture). The
- * Copilot item is a disabled placeholder for the chat panel that lands
- * in a later step. Future tabs (Diagram, Cost, Alternatives) can be
- * added to this list when they're implemented.
+ * Sections (Step 9o):
+ *   - Architecture — diagram canvas
+ *   - Tech Stack   — recommended technologies grouped by category
+ *
+ * Copilot is intentionally NOT a rail section anymore. It now lives as
+ * a collapsible drawer opened from the standalone header so the centre
+ * column can take the full available width when the user doesn't need
+ * the assistant.
  */
 
-export type RailItemKey = "architecture" | "copilot";
+export type RailItemKey = "architecture" | "tech-stack";
 
 export type RailItem = {
   key: RailItemKey;
@@ -26,12 +29,7 @@ export type RailItem = {
 
 const ITEMS: RailItem[] = [
   { key: "architecture", label: "Architecture" },
-  {
-    key: "copilot",
-    label: "Copilot",
-    hint: "Coming next",
-    disabled: true,
-  },
+  { key: "tech-stack", label: "Tech Stack" },
 ];
 
 type Props = {

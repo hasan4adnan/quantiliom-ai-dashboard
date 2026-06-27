@@ -3004,17 +3004,21 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* Two-column grid (rail | main). Copilot is no longer a grid column —
+ * it opens as a fixed drawer triggered from the standalone header, so
+ * the centre column always gets the full available width when the
+ * drawer is closed. */
 .workspace-standalone-body {
   flex: 1 1 auto;
   display: grid;
-  grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) minmax(320px, 360px);
+  grid-template-columns: minmax(200px, 220px) minmax(0, 1fr);
   gap: var(--space-20);
   padding: var(--space-20) var(--space-24);
   align-items: start;
 }
 
 .workspace-standalone-body:has(.workspace-rail--collapsed) {
-  grid-template-columns: 72px minmax(0, 1fr) minmax(320px, 360px);
+  grid-template-columns: 72px minmax(0, 1fr);
 }
 
 .workspace-standalone-body--empty {
@@ -3031,32 +3035,11 @@
   gap: var(--space-16);
 }
 
-/* Within the standalone surface, the rail and copilot stick to the top
- * of the viewport just under the sticky brand header. */
-.workspace-standalone-body .workspace-rail,
-.workspace-standalone-body .workspace-chat-panel {
+/* The rail sticks just below the standalone brand header so it stays
+ * reachable as the user scrolls a long Tech Stack page. */
+.workspace-standalone-body .workspace-rail {
   position: sticky;
   top: calc(64px + var(--space-12));
-}
-
-/* Stack the copilot column below the diagram on anything narrower than
- * ~1280px. Before this, the copilot stayed beside the diagram down to
- * 1100px which left the centre column too narrow on common laptops
- * (1280–1440) — most architecture diagrams ended up needing horizontal
- * scroll just because the chrome ate the available width. Stacking the
- * copilot lets the board take the full remaining width. */
-@media (max-width: 1280px) {
-  .workspace-standalone-body,
-  .workspace-standalone-body:has(.workspace-rail--collapsed) {
-    grid-template-columns: minmax(200px, 220px) minmax(0, 1fr);
-  }
-  .workspace-standalone-body:has(.workspace-rail--collapsed) {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
-  .workspace-standalone-body .workspace-chat-panel {
-    grid-column: 1 / -1;
-    position: static;
-  }
 }
 
 @media (max-width: 720px) {
@@ -7161,4 +7144,300 @@
   color: var(--text-muted);
   font-size: 14px;
   line-height: 1.5;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Tech Stack workspace board (Step 9o)
+ *
+ * Sibling to the Architecture diagram canvas. Reads the same normalized
+ * architecture result and renders technologies grouped by category as a
+ * grid of compact cards. Visual language matches the workspace: token
+ * colours, mono uppercase chips, gray-50 inner cells, no random glow.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.tech-stack-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  min-width: 0;
+}
+
+.tech-stack-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.tech-stack-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.tech-stack-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.tech-stack-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.tech-stack-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.tech-stack-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-16);
+}
+
+.tech-stack-group {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-16) var(--space-14);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.tech-stack-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.tech-stack-group-name {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.tech-stack-group-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.tech-stack-items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.tech-stack-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+
+.tech-stack-item-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.tech-stack-item-name {
+  font-size: 13.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.tech-stack-item-cat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.tech-stack-item-reason {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.tech-stack-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Workspace Copilot — collapsible drawer (Step 9o)
+ *
+ * Copilot no longer permanently consumes a right column. A small pill
+ * toggle in the standalone header opens a fixed drawer that slides in
+ * from the right and overlays the workspace; the central content
+ * (Architecture or Tech Stack) always gets the full grid width when the
+ * drawer is closed. The drawer is closed by the X button, the backdrop
+ * click, or Esc.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.workspace-standalone-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.workspace-copilot-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 5px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    background var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.workspace-copilot-toggle:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.workspace-copilot-toggle.is-open {
+  background: var(--surface-dark);
+  border-color: var(--surface-dark);
+  color: var(--text-on-dark);
+}
+
+.workspace-copilot-toggle-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.workspace-copilot-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 28, 30, 0.22);
+  z-index: 39;
+  animation: workspace-copilot-backdrop-in 180ms var(--ease-out);
+}
+
+@keyframes workspace-copilot-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.workspace-copilot-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  max-width: 92vw;
+  background: var(--surface-card);
+  border-left: 1px solid var(--border-default);
+  box-shadow: -10px 0 30px rgba(28, 28, 30, 0.08);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  animation: workspace-copilot-in 220ms var(--ease-out);
+}
+
+@keyframes workspace-copilot-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.workspace-copilot-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  padding: var(--space-14) var(--space-16);
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.workspace-copilot-drawer-title {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.workspace-copilot-drawer-close {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--border-default);
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out),
+    color var(--dur-fast) var(--ease-out);
+}
+
+.workspace-copilot-drawer-close:hover {
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+
+.workspace-copilot-drawer-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-16);
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Inside the drawer, the chat panel already has surface/border/padding
+ * from the drawer itself. Neutralize the panel's outer frame so it
+ * doesn't double up; keep its inner spacing intact. */
+.workspace-copilot-drawer-body .workspace-chat-panel {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  position: static;
+  top: auto;
+  min-height: 0;
+  border-radius: 0;
 }

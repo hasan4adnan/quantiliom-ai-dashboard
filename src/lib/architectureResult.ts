@@ -148,6 +148,169 @@ export function extractComponents(
 
 export type TechItem = { group: string; entries: string[] };
 
+/**
+ * Per-technology normalized item shape. The legacy `extractTechStack`
+ * groups by category and emits string arrays per group — fine for the
+ * compact preview but lossy for the workspace's Tech Stack page, which
+ * wants per-item rationale text. This is the richer shape used there.
+ */
+export type NormalizedTechStackItem = {
+  id: string;
+  name: string;
+  category: string | null;
+  reason: string | null;
+};
+
+function makeTechItem(
+  name: string,
+  category: string | null,
+  reason: string | null,
+  index: number
+): NormalizedTechStackItem {
+  const base = slugify(`${name}${category ? `-${category}` : ""}`);
+  const id = base.length > 0 ? base : `tech-${index + 1}`;
+  return { id, name, category, reason };
+}
+
+/**
+ * Extract individual tech-stack items from whichever shape the engine
+ * produced. We support, in priority order:
+ *
+ *   - object form: { frontend: ["react", ...], backend: ["node"] }
+ *   - object form with nested items: { data: [{ name, reason }, ...] }
+ *   - flat array of strings: ["react", "node", "postgres"]
+ *   - array of structured items: [{ name, category, reason }, ...]
+ *   - array of grouped objects: [{ group, entries: [...] }, ...]
+ *
+ * Anything we don't recognize is dropped silently rather than crashing.
+ */
+export function extractTechStackItems(
+  arch: Record<string, unknown>
+): NormalizedTechStackItem[] {
+  const stack = arch.techStack;
+  const out: NormalizedTechStackItem[] = [];
+  const seenIds = new Set<string>();
+  const push = (
+    name: string | null,
+    category: string | null,
+    reason: string | null
+  ) => {
+    if (!name) return;
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    let item = makeTechItem(trimmed, category, reason, out.length);
+    if (seenIds.has(item.id)) {
+      let n = 2;
+      while (seenIds.has(`${item.id}-${n}`)) n += 1;
+      item = { ...item, id: `${item.id}-${n}` };
+    }
+    seenIds.add(item.id);
+    out.push(item);
+  };
+
+  const obj = asObject(stack);
+  if (obj) {
+    for (const [group, value] of Object.entries(obj)) {
+      const flat = asStringArray(value);
+      if (flat.length > 0) {
+        for (const n of flat) push(n, group, null);
+        continue;
+      }
+      const single = asString(value);
+      if (single) {
+        push(single, group, null);
+        continue;
+      }
+      const objArr = asObjectArray(value);
+      if (objArr.length > 0) {
+        for (const o of objArr) {
+          const name =
+            asString(o.name) ??
+            asString(o.technology) ??
+            asString(o.label) ??
+            asString(o.tool);
+          const category =
+            asString(o.category) ??
+            asString(o.type) ??
+            asString(o.kind) ??
+            group;
+          const reason =
+            asString(o.reason) ??
+            asString(o.description) ??
+            asString(o.purpose) ??
+            asString(o.why);
+          push(name, category, reason);
+        }
+        continue;
+      }
+      const valObj = asObject(value);
+      if (valObj) {
+        const name =
+          asString(valObj.name) ??
+          asString(valObj.technology) ??
+          asString(valObj.label);
+        const category =
+          asString(valObj.category) ??
+          asString(valObj.type) ??
+          group;
+        const reason =
+          asString(valObj.reason) ??
+          asString(valObj.description) ??
+          asString(valObj.purpose);
+        push(name, category, reason);
+      }
+    }
+    return out;
+  }
+
+  const flatTop = asStringArray(stack);
+  if (flatTop.length > 0) {
+    for (const n of flatTop) push(n, null, null);
+    return out;
+  }
+
+  const arr = asObjectArray(stack);
+  if (arr.length > 0) {
+    for (const o of arr) {
+      // Legacy grouped form first: { group, entries: [...] }.
+      const groupName =
+        asString(o.group) ??
+        asString(o.category) ??
+        asString(o.layer) ??
+        null;
+      const entries = asStringArray(o.entries);
+      const items = asStringArray(o.items);
+      if (entries.length > 0) {
+        for (const n of entries) push(n, groupName, null);
+        continue;
+      }
+      if (items.length > 0) {
+        for (const n of items) push(n, groupName, null);
+        continue;
+      }
+      const name =
+        asString(o.name) ??
+        asString(o.technology) ??
+        asString(o.label) ??
+        asString(o.tool);
+      const category =
+        asString(o.category) ??
+        asString(o.type) ??
+        asString(o.kind) ??
+        groupName;
+      const reason =
+        asString(o.reason) ??
+        asString(o.description) ??
+        asString(o.purpose) ??
+        asString(o.why);
+      push(name, category, reason);
+    }
+    return out;
+  }
+
+  return out;
+}
+
 export function extractTechStack(
   arch: Record<string, unknown>
 ): TechItem[] {
