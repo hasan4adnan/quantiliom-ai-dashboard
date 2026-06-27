@@ -108,7 +108,12 @@ export function extractComponents(
         asString(c.layer) ??
         asString(c.kind) ??
         null;
+      // techChoice is the canonical per-component tech field in the
+      // current backend schema ("the API service is Fastify"). Earlier
+      // names (technologies/tech/stack/tools) are kept for tolerance
+      // against shape drift.
       const techCandidates = [
+        c.techChoice,
         c.technologies,
         c.tech,
         c.stack,
@@ -173,21 +178,55 @@ function makeTechItem(
 }
 
 /**
- * Extract individual tech-stack items from whichever shape the engine
- * produced. We support, in priority order:
- *
- *   - object form: { frontend: ["react", ...], backend: ["node"] }
- *   - object form with nested items: { data: [{ name, reason }, ...] }
- *   - flat array of strings: ["react", "node", "postgres"]
- *   - array of structured items: [{ name, category, reason }, ...]
- *   - array of grouped objects: [{ group, entries: [...] }, ...]
- *
- * Anything we don't recognize is dropped silently rather than crashing.
+ * Property names that may carry the tech-stack list on the architecture
+ * (or wrapper/recommendation/alternative) object.
  */
-export function extractTechStackItems(
-  arch: Record<string, unknown>
-): NormalizedTechStackItem[] {
-  const stack = arch.techStack;
+const TECH_STACK_KEYS: string[] = [
+  "techStack",
+  "tech_stack",
+  "technologyStack",
+  "technologies",
+  "recommendedTechStack",
+  "recommendedStack",
+  "stack",
+];
+
+function pickTechName(o: Record<string, unknown>): string | null {
+  // `choice` is the canonical TechStackItem field in the current backend
+  // schema. The other names are kept so shape drift / earlier mocks /
+  // partner data don't silently produce an empty page.
+  return (
+    asString(o.choice) ??
+    asString(o.name) ??
+    asString(o.technology) ??
+    asString(o.label) ??
+    asString(o.tool) ??
+    asString(o.value)
+  );
+}
+
+function pickTechCategory(o: Record<string, unknown>): string | null {
+  return (
+    asString(o.layer) ??
+    asString(o.category) ??
+    asString(o.type) ??
+    asString(o.kind) ??
+    asString(o.group)
+  );
+}
+
+function pickTechReason(o: Record<string, unknown>): string | null {
+  return (
+    asString(o.rationale) ??
+    asString(o.reason) ??
+    asString(o.description) ??
+    asString(o.purpose) ??
+    asString(o.why) ??
+    asString(o.justification)
+  );
+}
+
+function readTechStackValue(stack: unknown): NormalizedTechStackItem[] {
   const out: NormalizedTechStackItem[] = [];
   const seenIds = new Set<string>();
   const push = (
@@ -208,6 +247,7 @@ export function extractTechStackItems(
     out.push(item);
   };
 
+  // 1. Object-of-… form: { frontend: ["React"], backend: [{name:..,reason:..}] }
   const obj = asObject(stack);
   if (obj) {
     for (const [group, value] of Object.entries(obj)) {
@@ -224,60 +264,39 @@ export function extractTechStackItems(
       const objArr = asObjectArray(value);
       if (objArr.length > 0) {
         for (const o of objArr) {
-          const name =
-            asString(o.name) ??
-            asString(o.technology) ??
-            asString(o.label) ??
-            asString(o.tool);
-          const category =
-            asString(o.category) ??
-            asString(o.type) ??
-            asString(o.kind) ??
-            group;
-          const reason =
-            asString(o.reason) ??
-            asString(o.description) ??
-            asString(o.purpose) ??
-            asString(o.why);
-          push(name, category, reason);
+          push(
+            pickTechName(o),
+            pickTechCategory(o) ?? group,
+            pickTechReason(o)
+          );
         }
         continue;
       }
       const valObj = asObject(value);
       if (valObj) {
-        const name =
-          asString(valObj.name) ??
-          asString(valObj.technology) ??
-          asString(valObj.label);
-        const category =
-          asString(valObj.category) ??
-          asString(valObj.type) ??
-          group;
-        const reason =
-          asString(valObj.reason) ??
-          asString(valObj.description) ??
-          asString(valObj.purpose);
-        push(name, category, reason);
+        push(
+          pickTechName(valObj),
+          pickTechCategory(valObj) ?? group,
+          pickTechReason(valObj)
+        );
       }
     }
     return out;
   }
 
+  // 2. Flat array of strings.
   const flatTop = asStringArray(stack);
   if (flatTop.length > 0) {
     for (const n of flatTop) push(n, null, null);
     return out;
   }
 
+  // 3. Array of structured items — including legacy grouped form
+  //    { group, entries } and the backend's { layer, choice, rationale }.
   const arr = asObjectArray(stack);
   if (arr.length > 0) {
     for (const o of arr) {
-      // Legacy grouped form first: { group, entries: [...] }.
-      const groupName =
-        asString(o.group) ??
-        asString(o.category) ??
-        asString(o.layer) ??
-        null;
+      const groupName = pickTechCategory(o);
       const entries = asStringArray(o.entries);
       const items = asStringArray(o.items);
       if (entries.length > 0) {
@@ -288,27 +307,205 @@ export function extractTechStackItems(
         for (const n of items) push(n, groupName, null);
         continue;
       }
-      const name =
-        asString(o.name) ??
-        asString(o.technology) ??
-        asString(o.label) ??
-        asString(o.tool);
-      const category =
-        asString(o.category) ??
-        asString(o.type) ??
-        asString(o.kind) ??
-        groupName;
-      const reason =
-        asString(o.reason) ??
-        asString(o.description) ??
-        asString(o.purpose) ??
-        asString(o.why);
-      push(name, category, reason);
+      push(pickTechName(o), groupName, pickTechReason(o));
     }
     return out;
   }
 
   return out;
+}
+
+/**
+ * Extract individual tech-stack items from a single architecture-like
+ * object. Probes every property name in `TECH_STACK_KEYS` and returns
+ * the first that yields a non-empty result. Anything we don't
+ * recognize is dropped silently rather than crashing.
+ */
+export function extractTechStackItems(
+  arch: Record<string, unknown>
+): NormalizedTechStackItem[] {
+  for (const key of TECH_STACK_KEYS) {
+    const v = arch[key];
+    if (v === undefined || v === null) continue;
+    const items = readTechStackValue(v);
+    if (items.length > 0) return items;
+  }
+  return [];
+}
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Narrative tech-mention extractor
+ *
+ * When the backend's structured `techStack` is empty (or the engine
+ * skipped emitting it for a given run), the architecture text itself
+ * usually still mentions concrete technologies in summary / component
+ * roles / key decisions. This controlled dictionary lets the dashboard
+ * surface those mentions as a fallback Tech Stack list so the user
+ * isn't told "not available" when the page summary clearly says
+ * "React + Fastify + PostgreSQL".
+ *
+ * Rules:
+ *   - Case-insensitive whole-word match.
+ *   - Canonical display name preserved (e.g. "Next.js" not "nextjs").
+ *   - Bare "Go" is intentionally NOT a keyword because it collides
+ *     with the English verb; "Golang" still matches the same canonical.
+ *   - Each canonical entry fires at most once.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+type TechDictionaryEntry = {
+  canonical: string;
+  group: string;
+  aliases: string[];
+};
+
+const TECH_DICTIONARY: TechDictionaryEntry[] = [
+  // Frontend
+  { canonical: "React", group: "Frontend", aliases: ["react", "react.js", "reactjs"] },
+  { canonical: "Next.js", group: "Frontend", aliases: ["next.js", "nextjs"] },
+  { canonical: "Vite", group: "Frontend", aliases: ["vite"] },
+  { canonical: "Vue", group: "Frontend", aliases: ["vue.js", "vuejs", "vue"] },
+  { canonical: "Angular", group: "Frontend", aliases: ["angular"] },
+  { canonical: "Swift", group: "Frontend", aliases: ["swift"] },
+  { canonical: "Kotlin", group: "Frontend", aliases: ["kotlin"] },
+  { canonical: "React Native", group: "Frontend", aliases: ["react native"] },
+  { canonical: "Flutter", group: "Frontend", aliases: ["flutter"] },
+  // Backend
+  { canonical: "Node.js", group: "Backend", aliases: ["node.js", "nodejs", "node"] },
+  { canonical: "Express", group: "Backend", aliases: ["express.js", "expressjs", "express"] },
+  { canonical: "Fastify", group: "Backend", aliases: ["fastify"] },
+  { canonical: "NestJS", group: "Backend", aliases: ["nest.js", "nestjs"] },
+  { canonical: "Python", group: "Backend", aliases: ["python"] },
+  { canonical: "Django", group: "Backend", aliases: ["django"] },
+  { canonical: "FastAPI", group: "Backend", aliases: ["fastapi", "fast api"] },
+  { canonical: "Java", group: "Backend", aliases: ["java"] },
+  { canonical: "Spring Boot", group: "Backend", aliases: ["spring boot", "springboot"] },
+  { canonical: "Go", group: "Backend", aliases: ["golang"] },
+  // Data
+  { canonical: "PostgreSQL", group: "Data", aliases: ["postgresql", "postgres"] },
+  { canonical: "MySQL", group: "Data", aliases: ["mysql"] },
+  { canonical: "MongoDB", group: "Data", aliases: ["mongodb", "mongo"] },
+  { canonical: "Redis", group: "Data", aliases: ["redis"] },
+  { canonical: "Elasticsearch", group: "Data", aliases: ["elasticsearch"] },
+  { canonical: "OpenSearch", group: "Data", aliases: ["opensearch"] },
+  { canonical: "DynamoDB", group: "Data", aliases: ["dynamodb"] },
+  { canonical: "Firestore", group: "Data", aliases: ["firestore"] },
+  { canonical: "Supabase", group: "Data", aliases: ["supabase"] },
+  // Infrastructure / Cloud
+  { canonical: "AWS", group: "Infrastructure", aliases: ["aws", "amazon web services"] },
+  { canonical: "Google Cloud", group: "Infrastructure", aliases: ["google cloud", "gcp"] },
+  { canonical: "Azure", group: "Infrastructure", aliases: ["azure"] },
+  { canonical: "Docker", group: "Infrastructure", aliases: ["docker"] },
+  { canonical: "Kubernetes", group: "Infrastructure", aliases: ["kubernetes", "k8s"] },
+  { canonical: "Terraform", group: "Infrastructure", aliases: ["terraform"] },
+  { canonical: "CloudFront", group: "Infrastructure", aliases: ["cloudfront"] },
+  { canonical: "Amazon S3", group: "Infrastructure", aliases: ["amazon s3", "s3"] },
+  { canonical: "AWS Lambda", group: "Infrastructure", aliases: ["aws lambda", "lambda"] },
+  { canonical: "ECS", group: "Infrastructure", aliases: ["ecs"] },
+  { canonical: "RDS", group: "Infrastructure", aliases: ["rds"] },
+  { canonical: "Vercel", group: "Infrastructure", aliases: ["vercel"] },
+  { canonical: "Netlify", group: "Infrastructure", aliases: ["netlify"] },
+  // Realtime / Messaging
+  { canonical: "WebSocket", group: "Realtime", aliases: ["websocket", "web socket", "websockets"] },
+  { canonical: "Socket.IO", group: "Realtime", aliases: ["socket.io", "socketio"] },
+  { canonical: "Kafka", group: "Realtime", aliases: ["kafka"] },
+  { canonical: "RabbitMQ", group: "Realtime", aliases: ["rabbitmq", "rabbit mq"] },
+  { canonical: "BullMQ", group: "Realtime", aliases: ["bullmq", "bull mq"] },
+  { canonical: "Redis Pub/Sub", group: "Realtime", aliases: ["redis pub/sub", "redis pubsub"] },
+  { canonical: "Firebase", group: "Realtime", aliases: ["firebase"] },
+  // Auth / Payments / Integrations
+  { canonical: "Firebase Auth", group: "Auth & Security", aliases: ["firebase auth", "firebase authentication"] },
+  { canonical: "Auth0", group: "Auth & Security", aliases: ["auth0"] },
+  { canonical: "Clerk", group: "Auth & Security", aliases: ["clerk"] },
+  { canonical: "Stripe", group: "Integrations", aliases: ["stripe"] },
+  { canonical: "SendGrid", group: "Integrations", aliases: ["sendgrid"] },
+  { canonical: "Resend", group: "Integrations", aliases: ["resend"] },
+  // Observability
+  { canonical: "Sentry", group: "Observability", aliases: ["sentry"] },
+  { canonical: "Datadog", group: "Observability", aliases: ["datadog"] },
+  { canonical: "Prometheus", group: "Observability", aliases: ["prometheus"] },
+  { canonical: "Grafana", group: "Observability", aliases: ["grafana"] },
+  { canonical: "OpenTelemetry", group: "Observability", aliases: ["opentelemetry", "otel"] },
+];
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Walk `text` and return one normalized item per dictionary entry whose
+ * canonical or alias appears as a whole word. Used as the Tech Stack
+ * fallback when the engine's structured techStack is empty.
+ */
+export function extractMentionedTechnologies(
+  text: string
+): NormalizedTechStackItem[] {
+  if (!text || text.length === 0) return [];
+  const out: NormalizedTechStackItem[] = [];
+  const seen = new Set<string>();
+  for (const entry of TECH_DICTIONARY) {
+    for (const alias of entry.aliases) {
+      // Use a non-letter boundary instead of \b so aliases that end in
+      // a punctuation char (".js") still match — \b doesn't fire after
+      // a non-word character.
+      const pattern = new RegExp(
+        `(^|[^A-Za-z0-9])${escapeRegex(alias)}([^A-Za-z0-9]|$)`,
+        "i"
+      );
+      if (pattern.test(text)) {
+        const key = entry.canonical.toLowerCase();
+        if (seen.has(key)) break;
+        seen.add(key);
+        const slug = slugify(entry.canonical) || `mention-${out.length + 1}`;
+        out.push({
+          id: `mentioned-${slug}`,
+          name: entry.canonical,
+          category: entry.group,
+          reason: "Mentioned in architecture output",
+        });
+        break;
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * Concatenate every string-bearing field on an architecture object
+ * that the engine fills with prose — used as the input to
+ * extractMentionedTechnologies when no structured tech stack exists.
+ */
+export function gatherArchitectureText(
+  arch: Record<string, unknown>
+): string {
+  const parts: string[] = [];
+  const add = (v: unknown) => {
+    const s = asString(v);
+    if (s) parts.push(s);
+  };
+  add(arch.summary);
+  add(arch.overview);
+  add(arch.description);
+  for (const note of asStringArray(arch.keyDecisions)) parts.push(note);
+  for (const o of asObjectArray(arch.keyDecisions)) {
+    add(o.topic);
+    add(o.decision);
+    add(o.rationale);
+    add(o.summary);
+  }
+  for (const note of asStringArray(arch.scalingNotes)) parts.push(note);
+  for (const note of asStringArray(arch.securityNotes)) parts.push(note);
+  for (const note of asStringArray(arch.openQuestions)) parts.push(note);
+  for (const c of asObjectArray(arch.components)) {
+    add(c.name);
+    add(c.role);
+    add(c.rationale);
+    add(c.description);
+    add(c.purpose);
+    add(c.techChoice);
+    for (const a of asStringArray(c.alternatives)) parts.push(a);
+    for (const a of asStringArray(c.technologies)) parts.push(a);
+  }
+  return parts.join(" \n ");
 }
 
 export function extractTechStack(
@@ -469,6 +666,34 @@ export type NormalizedArchitectureEdge = {
   label: string | null;
 };
 
+/**
+ * Per-line cost item, normalized to the dashboard's shape regardless
+ * of the exact backend field names. `monthlyMin/MaxUsd` mirror the
+ * engine's stable contract; the optional component/category/driver
+ * fields give the Cost Estimate page enough context to render
+ * meaningful rows.
+ */
+export type NormalizedCostLineItem = {
+  id: string;
+  componentName: string | null;
+  category: string | null;
+  costDriver: string | null;
+  monthlyMinUsd: number | null;
+  monthlyMaxUsd: number | null;
+  notes: string[];
+};
+
+export type NormalizedCost = {
+  currency: string;
+  monthlyMinUsd: number | null;
+  monthlyMaxUsd: number | null;
+  confidence: string | null;
+  /** Short prose summary if the engine emitted one. */
+  summary: string | null;
+  assumptions: string[];
+  lineItems: NormalizedCostLineItem[];
+};
+
 export type NormalizedArchitecture = {
   /** The selected architecture's core fields, ready for direct rendering. */
   architecture: Record<string, unknown> | null;
@@ -492,6 +717,25 @@ export type NormalizedArchitecture = {
    * later step can light up a "view source" affordance.
    */
   diagramSource: string | null;
+  /**
+   * Structured tech-stack items extracted from any of the supported
+   * paths (direct architecture, recommended alternative, recommendation,
+   * derived outputs, wrapper root). Empty when none of those carry a
+   * usable techStack.
+   */
+  techStackItems: NormalizedTechStackItem[];
+  /**
+   * Dictionary-based fallback — technologies mentioned in the
+   * architecture's summary / components / decisions etc. Always
+   * populated when there's prose to scan; the Tech Stack board uses
+   * these only when `techStackItems` is empty.
+   */
+  techStackMentions: NormalizedTechStackItem[];
+  /**
+   * Normalized cost estimate (typically from the recommended
+   * alternative's `costEstimate`). Null when no cost data was found.
+   */
+  cost: NormalizedCost | null;
 };
 
 /**
@@ -633,6 +877,148 @@ export function extractEdges(
   return [];
 }
 
+/**
+ * Property names that may carry a cost estimate on the architecture
+ * (or wrapper/recommendation/alternative) object.
+ */
+const COST_KEYS: string[] = [
+  "cost",
+  "costEstimate",
+  "estimatedCost",
+  "monthlyCost",
+  "costs",
+];
+
+function asFiniteNumber(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+function readCostValue(raw: unknown): NormalizedCost | null {
+  // Plain string summary — promote it as the cost's summary.
+  const asStr = asString(raw);
+  if (asStr) {
+    return {
+      currency: "USD",
+      monthlyMinUsd: null,
+      monthlyMaxUsd: null,
+      confidence: null,
+      summary: asStr,
+      assumptions: [],
+      lineItems: [],
+    };
+  }
+  const obj = asObject(raw);
+  if (!obj) return null;
+
+  const currency = asString(obj.currency) ?? "USD";
+
+  // Range fields — support every alias the brief listed plus the
+  // backend's canonical `monthlyMin/MaxUsd`.
+  let monthlyMin =
+    asFiniteNumber(obj.monthlyMinUsd) ??
+    asFiniteNumber(obj.monthlyMin) ??
+    asFiniteNumber(obj.min) ??
+    asFiniteNumber(obj.low);
+  let monthlyMax =
+    asFiniteNumber(obj.monthlyMaxUsd) ??
+    asFiniteNumber(obj.monthlyMax) ??
+    asFiniteNumber(obj.max) ??
+    asFiniteNumber(obj.high);
+  const exact =
+    asFiniteNumber(obj.monthly) ??
+    asFiniteNumber(obj.totalMonthly) ??
+    asFiniteNumber(obj.estimatedMonthly);
+  if (monthlyMin === null && monthlyMax === null && exact !== null) {
+    monthlyMin = exact;
+    monthlyMax = exact;
+  }
+
+  const confidence = asString(obj.confidence);
+  const summary = asString(obj.summary) ?? asString(obj.range);
+
+  const assumptions = asStringArray(obj.assumptions);
+  const notes = asStringArray(obj.notes);
+
+  // Line items — prioritize lineItems, then breakdown, then items.
+  const itemSources = [obj.lineItems, obj.breakdown, obj.items];
+  let rawItems: Record<string, unknown>[] = [];
+  for (const src of itemSources) {
+    const arr = asObjectArray(src);
+    if (arr.length > 0) {
+      rawItems = arr;
+      break;
+    }
+  }
+  const lineItems: NormalizedCostLineItem[] = rawItems.map((it, idx) => ({
+    id:
+      asString(it.componentId) ??
+      asString(it.id) ??
+      `line-${idx + 1}`,
+    componentName:
+      asString(it.componentName) ??
+      asString(it.name) ??
+      asString(it.label),
+    category:
+      asString(it.category) ??
+      asString(it.type) ??
+      asString(it.layer),
+    costDriver:
+      asString(it.costDriver) ??
+      asString(it.driver) ??
+      asString(it.reason) ??
+      asString(it.description),
+    monthlyMinUsd:
+      asFiniteNumber(it.monthlyMinUsd) ??
+      asFiniteNumber(it.min) ??
+      asFiniteNumber(it.low),
+    monthlyMaxUsd:
+      asFiniteNumber(it.monthlyMaxUsd) ??
+      asFiniteNumber(it.max) ??
+      asFiniteNumber(it.high),
+    notes: asStringArray(it.notes),
+  }));
+
+  // Drop the whole result when nothing usable was found — keeps the
+  // board from rendering an empty card.
+  if (
+    monthlyMin === null &&
+    monthlyMax === null &&
+    summary === null &&
+    lineItems.length === 0 &&
+    assumptions.length === 0 &&
+    notes.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    currency,
+    monthlyMinUsd: monthlyMin,
+    monthlyMaxUsd: monthlyMax,
+    confidence,
+    summary,
+    assumptions: assumptions.length > 0 ? assumptions : notes,
+    lineItems,
+  };
+}
+
+/**
+ * Extract a normalized cost estimate from a single architecture-like
+ * object. Probes every property name in `COST_KEYS` and returns the
+ * first that yields a usable result.
+ */
+export function extractCost(
+  arch: Record<string, unknown>
+): NormalizedCost | null {
+  for (const key of COST_KEYS) {
+    const v = arch[key];
+    if (v === undefined || v === null) continue;
+    const result = readCostValue(v);
+    if (result) return result;
+  }
+  return null;
+}
+
 function buildTradeoffs(raw: unknown): ArchitectureTradeoffEntry[] {
   const arr = asObjectArray(raw);
   if (arr.length === 0) return [];
@@ -705,6 +1091,9 @@ export function normalizeArchitectureResult(
       tradeoffs: [],
       edges: [],
       diagramSource: null,
+      techStackItems: [],
+      techStackMentions: [],
+      cost: null,
     };
   }
 
@@ -730,6 +1119,7 @@ export function normalizeArchitectureResult(
     const alternatives = altsRaw.map((alt) =>
       buildAlternativeSummary(alt, recommendedProfile)
     );
+    const techSources = collectAuxSources(root, null, null);
     return {
       architecture: root,
       isWrapper: false,
@@ -740,6 +1130,11 @@ export function normalizeArchitectureResult(
       tradeoffs: buildTradeoffs(root.tradeoffs),
       edges: extractEdges(root),
       diagramSource: asString(root.mermaid) ?? asString(root.diagram),
+      techStackItems: findFirstNonEmpty(techSources, extractTechStackItems),
+      techStackMentions: extractMentionedTechnologies(
+        gatherArchitectureText(root)
+      ),
+      cost: findFirstTruthy(techSources, extractCost),
     };
   }
 
@@ -778,6 +1173,24 @@ export function normalizeArchitectureResult(
       ? asString(selectedRawAlt.mermaid) ?? asString(selectedRawAlt.diagram)
       : null);
 
+  const techSources = collectAuxSources(
+    root,
+    asObject(root.recommendation),
+    selectedRawAlt ?? null
+  );
+  // For the narrative fallback we scan the inner architecture's prose
+  // (where the engine actually writes summary / decisions / etc.) plus
+  // the recommendation/alternative summaries the wrapper carries.
+  const fallbackText = [
+    architecture ? gatherArchitectureText(architecture) : "",
+    asString(asObject(root.recommendation)?.explanation) ?? "",
+    asString(asObject(root.recommendation)?.rationale) ?? "",
+    selectedRawAlt ? (asString(selectedRawAlt.summary) ?? "") : "",
+    selectedRawAlt ? (asString(selectedRawAlt.overview) ?? "") : "",
+  ]
+    .filter((s) => s.length > 0)
+    .join(" \n ");
+
   return {
     architecture,
     isWrapper: true,
@@ -791,7 +1204,78 @@ export function normalizeArchitectureResult(
     tradeoffs: buildTradeoffs(root.tradeoffs),
     edges,
     diagramSource,
+    techStackItems: findFirstNonEmpty(techSources, extractTechStackItems),
+    techStackMentions: extractMentionedTechnologies(fallbackText),
+    cost: findFirstTruthy(techSources, extractCost),
   };
+}
+
+/**
+ * Build the prioritized list of objects the tech-stack and cost
+ * extractors should probe. The order reflects "most specific to least
+ * specific": the chosen architecture and alternative are the canonical
+ * source; the wrapper root is the last-resort catch-all. We also peek
+ * inside `derivedOutputs` / `outputs` because that's where the engine
+ * stamps per-alternative artifacts.
+ */
+function collectAuxSources(
+  root: Record<string, unknown>,
+  recommendationObj: Record<string, unknown> | null,
+  selectedRawAlt: Record<string, unknown> | null
+): Array<Record<string, unknown>> {
+  const out: Array<Record<string, unknown>> = [];
+  const seen = new Set<Record<string, unknown>>();
+  const push = (v: Record<string, unknown> | null | undefined) => {
+    if (!v || seen.has(v)) return;
+    seen.add(v);
+    out.push(v);
+  };
+  const altDerived = selectedRawAlt
+    ? asObject(selectedRawAlt.derivedOutputs)
+    : null;
+  const altOutputs = selectedRawAlt
+    ? asObject(selectedRawAlt.outputs)
+    : null;
+  const altArch = selectedRawAlt
+    ? pickNestedArchitecture(selectedRawAlt)
+    : null;
+  const recDerived = recommendationObj
+    ? asObject(recommendationObj.derivedOutputs)
+    : null;
+  const recOutputs = recommendationObj
+    ? asObject(recommendationObj.outputs)
+    : null;
+  push(altArch);
+  push(selectedRawAlt);
+  push(altDerived);
+  push(altOutputs);
+  push(recommendationObj);
+  push(recDerived);
+  push(recOutputs);
+  push(root);
+  return out;
+}
+
+function findFirstNonEmpty<T>(
+  sources: Array<Record<string, unknown>>,
+  extract: (src: Record<string, unknown>) => T[]
+): T[] {
+  for (const src of sources) {
+    const items = extract(src);
+    if (items.length > 0) return items;
+  }
+  return [];
+}
+
+function findFirstTruthy<T>(
+  sources: Array<Record<string, unknown>>,
+  extract: (src: Record<string, unknown>) => T | null
+): T | null {
+  for (const src of sources) {
+    const v = extract(src);
+    if (v) return v;
+  }
+  return null;
 }
 
 /* ════════════════════════════════════════════════════════════════════════

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import ArchitectureBoard from "../components/ArchitectureBoard";
+import CostEstimateBoard from "../components/CostEstimateBoard";
 import TechStackBoard from "../components/TechStackBoard";
 import WorkspaceChatPanel from "../components/WorkspaceChatPanel";
 import WorkspaceRail, { type RailItemKey } from "../components/WorkspaceRail";
@@ -137,8 +138,10 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
                 architecture={state.architecture}
                 brief={state.brief}
               />
-            ) : (
+            ) : activeSection === "tech-stack" ? (
               <TechStackBoard architecture={state.architecture} />
+            ) : (
+              <CostEstimateBoard architecture={state.architecture} />
             )}
           </main>
         </div>

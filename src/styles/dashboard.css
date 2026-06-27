@@ -7295,6 +7295,287 @@
   background: var(--surface-card);
 }
 
+/* Fallback caption shown when the page was built from
+ * controlled-dictionary mentions rather than a structured techStack. */
+.tech-stack-board-note {
+  margin: var(--space-4) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Cost Estimate workspace board (Step 9p)
+ *
+ * Shares the workspace's visual language with the Tech Stack board:
+ * compact card header, mono uppercase chips, neutral surface cards.
+ * The range card is the only deliberately "loud" element — a large
+ * monetary range so the headline number is obvious at a glance.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.cost-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-20);
+  min-width: 0;
+}
+
+.cost-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.cost-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.cost-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.cost-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.cost-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.cost-range-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-20) var(--space-24);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.cost-range-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-12);
+  flex-wrap: wrap;
+}
+
+.cost-range-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.cost-confidence {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: var(--gray-50);
+  color: var(--text-secondary);
+}
+
+.cost-confidence--high {
+  background: var(--accent-soft);
+  border-color: rgba(239, 111, 46, 0.24);
+  color: var(--accent);
+}
+
+.cost-confidence--medium {
+  border-color: var(--border-default);
+  color: var(--text-secondary);
+}
+
+.cost-confidence--low {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.cost-range-value {
+  font-size: 34px;
+  line-height: 1.1;
+  letter-spacing: -0.018em;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.cost-range-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cost-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-16) var(--space-20);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.cost-summary-text {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.cost-breakdown,
+.cost-assumptions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  padding: var(--space-16) var(--space-20);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--surface-card);
+}
+
+.cost-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.cost-section-name {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.cost-section-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.cost-line-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.cost-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-12);
+  padding: var(--space-10) 0;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cost-line:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.cost-line-main {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-8);
+  flex-wrap: wrap;
+}
+
+.cost-line-name {
+  font-size: 13.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+}
+
+.cost-line-cat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.cost-line-driver {
+  grid-column: 1 / 2;
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.cost-line-notes {
+  grid-column: 1 / 2;
+  list-style: disc;
+  padding-left: var(--space-16);
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.cost-line-value {
+  font-family: var(--font-mono);
+  font-size: 13.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  align-self: center;
+  grid-column: 2 / 3;
+  grid-row: 1 / 2;
+}
+
+.cost-assumption-list {
+  list-style: disc;
+  padding-left: var(--space-20);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.cost-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
 /* ═════════════════════════════════════════════════════════════════════════
  * Workspace Copilot — collapsible drawer (Step 9o)
  *

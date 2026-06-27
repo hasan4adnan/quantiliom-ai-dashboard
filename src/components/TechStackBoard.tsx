@@ -1,29 +1,25 @@
 import { useMemo } from "react";
 import {
   architecturePattern,
-  extractComponents,
-  extractTechStackItems,
   normalizeArchitectureResult,
   prettyEnum,
   type NormalizedTechStackItem,
 } from "../lib/architectureResult";
 
 /**
- * Workspace Tech Stack page.
+ * Workspace Tech Stack page (Step 9p).
  *
- * Sibling to ArchitectureBoard inside the Architecture Workspace. Reads
- * the same normalized architecture result and surfaces the engine's
- * tech-stack recommendation grouped by category, plus a quiet
- * profile/pattern/count chip strip.
+ * Reads `techStackItems` from `normalizeArchitectureResult` — that
+ * function probes every supported path (selected architecture,
+ * recommended alternative, recommendation, derivedOutputs/outputs,
+ * wrapper root) and recognises the backend's `{ layer, choice,
+ * rationale }` items as well as legacy shapes.
  *
- * Data path:
- *   1. `extractTechStackItems(arch)` for the structured items the engine
- *      emits (handles flat strings, grouped objects, nested per-item
- *      records).
- *   2. If empty, fall back to a per-component `technologies[]` sweep so
- *      we still surface something meaningful when the engine only put
- *      tech inside components.
- *   3. If still empty, render a calm empty state.
+ * If the structured stack is empty we render the engine's
+ * `techStackMentions` instead — a controlled-dictionary extraction
+ * from the architecture's prose (summary, components, decisions,
+ * alternative summaries). A subtle caption tells the user the page
+ * was built from mentions rather than an explicit stack.
  *
  * What this view intentionally does NOT do:
  *   - render raw JSON
@@ -54,17 +50,11 @@ const GROUP_ORDER: string[] = [
   "Other",
 ];
 
-function slugifyLocal(s: string): string {
-  return s
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 /**
- * Normalize an engine category/name pair to one of the known display
- * groups. Pure keyword sniffing on lowercase text — anything we can't
- * place lands in "Other" rather than the dropped on the floor.
+ * Map an engine-provided category label (e.g. "frontend",
+ * "backend_language", "primary_database") to one of our display
+ * groups. Falls back to a keyword sniff on the technology name when
+ * the category itself doesn't carry enough signal.
  */
 function normalizeGroup(rawCategory: string | null, name: string): string {
   const test = `${rawCategory ?? ""} ${name}`.toLowerCase();
@@ -75,29 +65,31 @@ function normalizeGroup(rawCategory: string | null, name: string): string {
   )
     return "Frontend";
   if (
-    /\b(backend|api|server|node|python|django|fastapi|express|nestjs|spring|rails|go|rust|java|graphql)\b/.test(
+    /\b(backend|api|server|node|python|django|fastapi|express|nestjs|fastify|spring|rails|rust|java|graphql)\b/.test(
       test
     )
   )
     return "Backend";
   if (
-    /\b(realtime|real[-_ ]?time|websocket|pubsub|socket|stream|sse)\b/.test(test)
+    /\b(realtime|real[-_ ]?time|websocket|pubsub|socket|stream|sse|kafka|rabbit|bullmq)\b/.test(
+      test
+    )
   )
     return "Realtime";
   if (
-    /\b(data|database|datastore|storage|cache|queue|search|postgres|mysql|mongo|dynamo|redis|kafka|rabbit|sqs|elasticsearch|opensearch|s3|sql|nosql|warehouse|blob|bucket)\b/.test(
+    /\b(data|database|datastore|storage|cache|queue|search|postgres|mysql|mongo|dynamo|redis|elasticsearch|opensearch|s3|sql|nosql|warehouse|blob|bucket|firestore|supabase)\b/.test(
       test
     )
   )
     return "Data";
   if (
-    /\b(infra|infrastructure|deploy|kubernetes|k8s|docker|terraform|aws|gcp|azure|cloud|cdn|nginx|load[-_ ]?balancer|edge|ingress|hosting|vercel|netlify)\b/.test(
+    /\b(infra|infrastructure|deploy|kubernetes|k8s|docker|terraform|aws|gcp|azure|cloud|cdn|nginx|load[-_ ]?balancer|edge|ingress|hosting|vercel|netlify|lambda|ecs|rds|cloudfront)\b/.test(
       test
     )
   )
     return "Infrastructure";
   if (
-    /\b(auth|authn|authz|oauth|jwt|sso|firebase[-_ ]?auth|clerk|cognito|security|encryption|tls|iam|secrets|keycloak)\b/.test(
+    /\b(auth|authn|authz|oauth|jwt|sso|firebase[-_ ]?auth|clerk|cognito|security|encryption|tls|iam|secrets|auth0)\b/.test(
       test
     )
   )
@@ -109,7 +101,7 @@ function normalizeGroup(rawCategory: string | null, name: string): string {
   )
     return "Observability";
   if (
-    /\b(integration|webhook|stripe|twilio|sendgrid|mailchimp|saas|3rd|third[-_ ]?party|provider|email|sms|notification)\b/.test(
+    /\b(integration|webhook|stripe|twilio|sendgrid|resend|mailchimp|saas|3rd|third[-_ ]?party|provider|email|sms|notification)\b/.test(
       test
     )
   )
@@ -117,65 +109,45 @@ function normalizeGroup(rawCategory: string | null, name: string): string {
   return "Other";
 }
 
+function groupItems(items: NormalizedTechStackItem[]): Group[] {
+  if (items.length === 0) return [];
+  const buckets = new Map<string, NormalizedTechStackItem[]>();
+  for (const it of items) {
+    const g = normalizeGroup(it.category, it.name);
+    const arr = buckets.get(g);
+    if (arr) arr.push(it);
+    else buckets.set(g, [it]);
+  }
+  const known = GROUP_ORDER.filter((g) => buckets.has(g));
+  const unknown = [...buckets.keys()]
+    .filter((g) => !GROUP_ORDER.includes(g))
+    .sort();
+  return [...known, ...unknown].map((g) => ({
+    key: g,
+    label: g,
+    items: buckets.get(g) ?? [],
+  }));
+}
+
 export default function TechStackBoard({ architecture }: Props) {
   const normalized = useMemo(
     () => normalizeArchitectureResult(architecture),
     [architecture]
   );
+
+  // Prefer the engine's structured items; fall back to dictionary
+  // mentions when none were emitted. We treat this as a single ordered
+  // pipeline so the page is consistently non-empty when the architecture
+  // text mentions concrete technologies.
+  const isFallback =
+    normalized.techStackItems.length === 0 &&
+    normalized.techStackMentions.length > 0;
+  const items = isFallback
+    ? normalized.techStackMentions
+    : normalized.techStackItems;
+  const groups = useMemo(() => groupItems(items), [items]);
+
   const arch = normalized.architecture;
-
-  const items = useMemo<NormalizedTechStackItem[]>(() => {
-    if (!arch) return [];
-    const primary = extractTechStackItems(arch);
-    if (primary.length > 0) return primary;
-    // Inference fallback: collect each component's `technologies[]` and
-    // dedupe by lowercased name so a stack like "PostgreSQL" mentioned
-    // by three components only appears once.
-    const components = extractComponents(arch);
-    const seen = new Set<string>();
-    const out: NormalizedTechStackItem[] = [];
-    let idx = 0;
-    for (const c of components) {
-      for (const t of c.technologies) {
-        const key = t.trim().toLowerCase();
-        if (!key || seen.has(key)) continue;
-        seen.add(key);
-        const slug = slugifyLocal(t) || `tech-${idx + 1}`;
-        out.push({
-          id: `infer-${slug}-${idx}`,
-          name: t,
-          category: c.category,
-          reason: c.name,
-        });
-        idx += 1;
-      }
-    }
-    return out;
-  }, [arch]);
-
-  const groups = useMemo<Group[]>(() => {
-    if (items.length === 0) return [];
-    const buckets = new Map<string, NormalizedTechStackItem[]>();
-    for (const it of items) {
-      const g = normalizeGroup(it.category, it.name);
-      const arr = buckets.get(g);
-      if (arr) arr.push(it);
-      else buckets.set(g, [it]);
-    }
-    // Preserve our known display order; unknown buckets land at the
-    // end alphabetically (defensive — normalizeGroup currently only
-    // emits known labels, but a future edit might add more).
-    const known = GROUP_ORDER.filter((g) => buckets.has(g));
-    const unknown = [...buckets.keys()]
-      .filter((g) => !GROUP_ORDER.includes(g))
-      .sort();
-    return [...known, ...unknown].map((g) => ({
-      key: g,
-      label: g,
-      items: buckets.get(g) ?? [],
-    }));
-  }, [items]);
-
   const pattern = arch ? architecturePattern(arch) : null;
   const profileLabel = normalized.recommendedProfileLabel;
 
@@ -203,6 +175,11 @@ export default function TechStackBoard({ architecture }: Props) {
               </span>
             ))}
           </div>
+        ) : null}
+        {isFallback ? (
+          <p className="tech-stack-board-note" role="note">
+            Extracted from the architecture output.
+          </p>
         ) : null}
       </header>
 
