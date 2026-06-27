@@ -3039,7 +3039,13 @@
   top: calc(64px + var(--space-12));
 }
 
-@media (max-width: 1100px) {
+/* Stack the copilot column below the diagram on anything narrower than
+ * ~1280px. Before this, the copilot stayed beside the diagram down to
+ * 1100px which left the centre column too narrow on common laptops
+ * (1280–1440) — most architecture diagrams ended up needing horizontal
+ * scroll just because the chrome ate the available width. Stacking the
+ * copilot lets the board take the full remaining width. */
+@media (max-width: 1280px) {
   .workspace-standalone-body,
   .workspace-standalone-body:has(.workspace-rail--collapsed) {
     grid-template-columns: minmax(200px, 220px) minmax(0, 1fr);
@@ -6952,10 +6958,22 @@
   font-family: var(--font-sans);
 }
 
+/* The frame is a position:relative wrapper so the edge fades and the
+ * scroll hint can overlay the canvas-grid without being trapped inside
+ * its scroll container. Keep `min-height: 0` so the flex layout above
+ * doesn't artificially expand the frame when the canvas-grid hits its
+ * own min-height. */
+.architecture-canvas-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+}
+
 .architecture-canvas-grid {
   flex: 1 1 auto;
   position: relative;
-  min-height: 620px;
+  min-height: 580px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background-color: #fff;
@@ -6968,23 +6986,103 @@
   background-position: 0 0;
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  /* Contain scroll chaining so dragging inside the canvas doesn't
+   * scroll the page underneath when the canvas hits its end. */
+  overscroll-behavior: contain;
 }
 
 .architecture-diagram-stage {
   position: relative;
-  /* width/height are set inline from the computed diagram model */
+  /* width/height are set inline from the computed diagram model. The
+   * stage sits in the top-left of the canvas-grid when its content is
+   * narrower than the viewport; the dotted-grid background simply
+   * extends around it, which reads as "the canvas has room". */
 }
 
 .architecture-diagram-svg {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  /* Edges sit BEHIND nodes (nodes come after the SVG in DOM order and
+   * default z-index stacking puts them on top). The SVG never absorbs
+   * pointer events. */
 }
 
 .architecture-diagram-edge {
-  stroke: rgba(28, 28, 30, 0.3);
-  stroke-width: 1.2;
+  stroke: rgba(28, 28, 30, 0.22);
+  stroke-width: 1.4;
   fill: none;
+  marker-end: url(#arch-arrow);
+}
+
+.architecture-diagram-edge-arrow {
+  fill: rgba(28, 28, 30, 0.4);
+}
+
+/* Edge fade overlays — appear ONLY when ResizeObserver detects
+ * horizontal overflow on the canvas-grid, signalling that there's
+ * more diagram to scroll towards. Each side has its own variant so we
+ * can fade off only the direction the user can still scroll. The
+ * fades sit on top of canvas-grid (inside canvas-frame), so they stay
+ * pinned to the visible viewport rather than scrolling with content. */
+.architecture-canvas-fade {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 48px;
+  pointer-events: none;
+}
+
+.architecture-canvas-fade--right {
+  right: 1px;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.92) 80%,
+    #fff
+  );
+  border-top-right-radius: var(--radius-lg);
+  border-bottom-right-radius: var(--radius-lg);
+}
+
+.architecture-canvas-fade--left {
+  left: 1px;
+  background: linear-gradient(
+    to left,
+    rgba(255, 255, 255, 0),
+    rgba(255, 255, 255, 0.92) 80%,
+    #fff
+  );
+  border-top-left-radius: var(--radius-lg);
+  border-bottom-left-radius: var(--radius-lg);
+}
+
+.architecture-canvas-scroll-hint {
+  position: absolute;
+  bottom: var(--space-12);
+  right: var(--space-16);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(28, 28, 30, 0.06);
+}
+
+.architecture-canvas-scroll-hint-glyph {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
 }
 
 .architecture-diagram-node {
