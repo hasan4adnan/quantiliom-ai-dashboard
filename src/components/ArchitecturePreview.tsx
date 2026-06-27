@@ -1,12 +1,29 @@
+import {
+  architecturePattern,
+  architectureSummary,
+  asStringArray,
+  extractComponents,
+  extractTechStack,
+  hasAlternativesArtifact,
+  hasCostArtifact,
+  hasMermaidArtifact,
+  listPreview,
+  normalizeArchitectureResult,
+  prettyEnum,
+} from "../lib/architectureResult";
+
 /**
  * Compact, read-only preview of the architecture decision payload the
  * backend produced from the normalized requirements.
  *
- * The shape of the architecture result lives in the backend engine and
- * may evolve. We treat it as `unknown` here and use safe type guards
- * before reading any field — the dashboard should never crash if a
- * field shows up as a different shape than expected. This is intentionally
- * a small preview; the full internal workspace is the next step.
+ * Uses the same `normalizeArchitectureResult` helper as the workspace
+ * board, so the preview surfaces real component counts / pattern /
+ * summary whether the backend returned the direct architecture shape or
+ * the decision-wrapper shape (recommendedProfile + recommendation +
+ * tradeoffs + alternatives[]).
+ *
+ * This is intentionally a small preview; the full internal workspace is
+ * where the user gets the full board with tradeoffs + alternatives.
  */
 
 type Props = {
@@ -21,118 +38,7 @@ type Props = {
   onOpenWorkspace?: () => void;
 };
 
-function asObject(v: unknown): Record<string, unknown> | null {
-  if (!v || typeof v !== "object" || Array.isArray(v)) return null;
-  return v as Record<string, unknown>;
-}
-
-function asString(v: unknown): string | null {
-  return typeof v === "string" && v.trim().length > 0 ? v : null;
-}
-
-function asStringArray(v: unknown): string[] {
-  if (!Array.isArray(v)) return [];
-  return v.filter((x): x is string => typeof x === "string" && x.length > 0);
-}
-
-function asObjectArray(v: unknown): Record<string, unknown>[] {
-  if (!Array.isArray(v)) return [];
-  return v
-    .map((x) => asObject(x))
-    .filter((x): x is Record<string, unknown> => x !== null);
-}
-
-function prettyEnum(v: string | null): string | null {
-  if (!v) return null;
-  return v
-    .split("_")
-    .map((p) => (p.length === 0 ? p : p[0]!.toUpperCase() + p.slice(1)))
-    .join(" ");
-}
-
 const MAX_LIST_PREVIEW = 5;
-
-function listPreview<T>(items: T[]): { shown: T[]; rest: number } {
-  if (items.length <= MAX_LIST_PREVIEW) return { shown: items, rest: 0 };
-  return {
-    shown: items.slice(0, MAX_LIST_PREVIEW),
-    rest: items.length - MAX_LIST_PREVIEW,
-  };
-}
-
-type Component = { name: string; role: string | null };
-
-function extractComponents(req: Record<string, unknown>): Component[] {
-  const raw = asObjectArray(req.components);
-  return raw
-    .map((c) => {
-      const name = asString(c.name) ?? asString(c.title);
-      if (!name) return null;
-      const role =
-        asString(c.role) ??
-        asString(c.purpose) ??
-        asString(c.description) ??
-        null;
-      return { name, role };
-    })
-    .filter((c): c is Component => c !== null);
-}
-
-type TechItem = { group: string; entries: string[] };
-
-function extractTechStack(req: Record<string, unknown>): TechItem[] {
-  const stack = req.techStack;
-
-  // Object form: { frontend: ["react"], backend: ["node"], … }
-  const obj = asObject(stack);
-  if (obj) {
-    const out: TechItem[] = [];
-    for (const [group, value] of Object.entries(obj)) {
-      const entries = asStringArray(value);
-      if (entries.length === 0) {
-        const single = asString(value);
-        if (single) out.push({ group, entries: [single] });
-      } else {
-        out.push({ group, entries });
-      }
-    }
-    return out;
-  }
-
-  // Array of strings.
-  const flat = asStringArray(stack);
-  if (flat.length > 0) {
-    return [{ group: "Stack", entries: flat }];
-  }
-
-  // Array of { group, entries } / { name, category }.
-  const arr = asObjectArray(stack);
-  if (arr.length > 0) {
-    return arr
-      .map((row) => {
-        const group =
-          asString(row.group) ??
-          asString(row.category) ??
-          asString(row.layer) ??
-          asString(row.name) ??
-          null;
-        const entries =
-          asStringArray(row.entries).length > 0
-            ? asStringArray(row.entries)
-            : asStringArray(row.items);
-        if (!group) return null;
-        if (entries.length === 0) {
-          const single = asString(row.value) ?? asString(row.choice);
-          if (!single) return null;
-          return { group, entries: [single] };
-        }
-        return { group, entries };
-      })
-      .filter((t): t is TechItem => t !== null);
-  }
-
-  return [];
-}
 
 export default function ArchitecturePreview({
   architecture,
@@ -140,52 +46,82 @@ export default function ArchitecturePreview({
   onStartOver,
   onOpenWorkspace,
 }: Props) {
-  const arch = asObject(architecture);
-  const canOpenWorkspace = !!onOpenWorkspace && !!arch;
+  const normalized = normalizeArchitectureResult(architecture);
+  const arch = normalized.architecture;
+  const canOpenWorkspace = !!onOpenWorkspace && !!architecture;
 
   if (!arch) {
+    // The backend ran successfully but we couldn't locate a structured
+    // architecture object. Still allow opening the workspace so the user
+    // can see the tradeoffs/alternatives we did extract.
     return (
-      <div className="discovery-error-card" role="alert">
-        <div className="discovery-flow-eyebrow">
-          <span className="discovery-flow-eyebrow-dot" aria-hidden="true" />
-          Architecture
-        </div>
-        <h2 className="discovery-flow-title">
-          Architecture payload was empty
-        </h2>
-        <p className="discovery-flow-sub">
-          The backend returned a succeeded job but the architecture result
-          was missing. Go back to requirements and try again.
-        </p>
+      <div
+        className="discovery-quest-shell"
+        role="region"
+        aria-label="Architecture preview"
+      >
+        <header className="discovery-quest-header">
+          <div className="discovery-flow-eyebrow">
+            <span className="discovery-flow-eyebrow-dot" aria-hidden="true" />
+            Architecture
+          </div>
+          <h2 className="discovery-flow-title">
+            Architecture decision ready
+          </h2>
+          <p className="discovery-flow-sub">
+            The engine returned a decision and{" "}
+            {normalized.alternatives.length} profile alternative
+            {normalized.alternatives.length === 1 ? "" : "s"}. Open the
+            workspace to review the tradeoffs and details.
+          </p>
+          {normalized.recommendedProfileLabel ? (
+            <div className="discovery-quest-meta">
+              <span className="discovery-meta-chip">
+                <span>Profile</span>
+                <strong>{normalized.recommendedProfileLabel}</strong>
+              </span>
+              {normalized.alternatives.length > 0 ? (
+                <span className="discovery-meta-chip">
+                  <span>Alternatives</span>
+                  <strong>{normalized.alternatives.length}</strong>
+                </span>
+              ) : null}
+            </div>
+          ) : null}
+        </header>
         <div className="discovery-flow-foot discovery-flow-foot-split">
-          <button
-            type="button"
-            className="wiz-btn wiz-btn-ghost"
-            onClick={onStartOver}
-          >
-            Start over
-          </button>
+          <div className="discovery-flow-foot-left">
+            <button
+              type="button"
+              className="wiz-btn wiz-btn-ghost"
+              onClick={onStartOver}
+            >
+              Start over
+            </button>
+            <button
+              type="button"
+              className="wiz-btn wiz-btn-ghost"
+              onClick={onBackToRequirements}
+            >
+              ← Back to requirements
+            </button>
+          </div>
           <button
             type="button"
             className="wiz-btn wiz-btn-dark"
-            onClick={onBackToRequirements}
+            onClick={canOpenWorkspace ? onOpenWorkspace : undefined}
+            disabled={!canOpenWorkspace}
+            aria-disabled={!canOpenWorkspace}
           >
-            ← Back to requirements
+            Open architecture workspace →
           </button>
         </div>
       </div>
     );
   }
 
-  const summary =
-    asString(arch.summary) ??
-    asString(arch.overview) ??
-    asString(arch.description);
-  const pattern =
-    asString(arch.patternUsed) ??
-    asString(arch.pattern) ??
-    asString(arch.architecturePattern);
-
+  const summary = architectureSummary(arch);
+  const pattern = architecturePattern(arch);
   const components = extractComponents(arch);
   const techStack = extractTechStack(arch);
   const decisions = asStringArray(arch.keyDecisions);
@@ -194,16 +130,21 @@ export default function ArchitecturePreview({
   const openQuestions = asStringArray(arch.openQuestions);
   const warnings = asStringArray(arch.validationWarnings);
 
-  const componentsView = listPreview(components);
-  const decisionsView = listPreview(decisions);
-  const scalingView = listPreview(scaling);
-  const securityView = listPreview(security);
-  const openQuestionsView = listPreview(openQuestions);
+  const componentsView = listPreview(components, MAX_LIST_PREVIEW);
+  const decisionsView = listPreview(decisions, MAX_LIST_PREVIEW);
+  const scalingView = listPreview(scaling, MAX_LIST_PREVIEW);
+  const securityView = listPreview(security, MAX_LIST_PREVIEW);
+  const openQuestionsView = listPreview(openQuestions, MAX_LIST_PREVIEW);
 
-  const hasMermaid = asString(arch.mermaid) !== null;
+  const hasMermaid =
+    hasMermaidArtifact(arch) ||
+    normalized.alternatives.some((a) => a.hasMermaid);
   const hasCost =
-    asObject(arch.cost) !== null || asString(arch.costEstimate) !== null;
-  const hasAlternatives = asObjectArray(arch.alternatives).length > 0;
+    hasCostArtifact(arch) || normalized.alternatives.some((a) => a.hasCost);
+  const hasAlternatives =
+    hasAlternativesArtifact(arch) || normalized.alternatives.length > 0;
+
+  const recommendedLabel = normalized.recommendedProfileLabel;
 
   return (
     <div
@@ -218,8 +159,17 @@ export default function ArchitecturePreview({
         </div>
         <h2 className="discovery-flow-title">Architecture ready</h2>
         {summary ? <p className="discovery-flow-sub">{summary}</p> : null}
-        {pattern || components.length > 0 ? (
+        {recommendedLabel ||
+        pattern ||
+        components.length > 0 ||
+        normalized.alternatives.length > 0 ? (
           <div className="discovery-quest-meta">
+            {recommendedLabel ? (
+              <span className="discovery-meta-chip">
+                <span>Profile</span>
+                <strong>{recommendedLabel}</strong>
+              </span>
+            ) : null}
             {pattern ? (
               <span className="discovery-meta-chip">
                 <span>Pattern</span>
@@ -230,6 +180,12 @@ export default function ArchitecturePreview({
               <span className="discovery-meta-chip">
                 <span>Components</span>
                 <strong>{components.length}</strong>
+              </span>
+            ) : null}
+            {normalized.alternatives.length > 0 ? (
+              <span className="discovery-meta-chip">
+                <span>Alternatives</span>
+                <strong>{normalized.alternatives.length}</strong>
               </span>
             ) : null}
           </div>
@@ -385,7 +341,7 @@ export default function ArchitecturePreview({
               <li className="arch-artifact">
                 <span className="arch-artifact-name">System diagram</span>
                 <span className="arch-artifact-note">
-                  Mermaid source available — interactive viewer opens in the
+                  Diagram source available — interactive viewer opens in the
                   workspace.
                 </span>
               </li>

@@ -46,9 +46,10 @@ export default function ArchitectureLoadingPanel({ onCancel }: Props) {
       </div>
       <h2 className="discovery-flow-title">Generating architecture</h2>
       <p className="discovery-flow-sub">
-        We&rsquo;re evaluating system components, technical trade-offs,
-        scalability, and deployment implications based on your normalized
-        requirements. This usually takes about a minute.
+        We&rsquo;re evaluating alternative profiles, system components,
+        technical trade-offs, scalability, and deployment implications
+        based on your normalized requirements. This can take a few
+        minutes while we prepare the decision output.
       </p>
 
       <ul className="discovery-step-list">

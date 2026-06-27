@@ -2808,11 +2808,24 @@
  * frame, the empty card, and an unobtrusive fade-in on entry.
  * ═════════════════════════════════════════════════════════════════════════ */
 .onboarding-standalone {
+  /* The global <body> uses overflow:hidden because the dashboard shell
+   * has its own internal .app-scroll container. Standalone surfaces
+   * render OUTSIDE that shell, so they must own their own scrolling
+   * — otherwise content past the viewport is clipped by body. We use
+   * dynamic viewport height (dvh) so mobile address-bar collapses don't
+   * leave a dead strip at the bottom, and fall back to vh for older
+   * browsers via min-height. */
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface-app);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   animation: onboarding-enter var(--dur-slow) var(--ease-out);
 }
 
@@ -2961,11 +2974,21 @@
  * the board. On <= 720px the rail collapses to a horizontal strip.
  * ═════════════════════════════════════════════════════════════════════════ */
 .workspace-standalone {
+  /* Same rationale as .onboarding-standalone above: the global <body>
+   * is overflow:hidden so this standalone surface must own its own
+   * scroll container — otherwise the architecture board (which can
+   * easily exceed 100vh) gets clipped. */
+  height: 100vh;
+  height: 100dvh;
   min-height: 100vh;
   width: 100%;
   display: flex;
   flex-direction: column;
   background: var(--surface-app);
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .workspace-standalone-header {
@@ -6867,4 +6890,177 @@
     align-items: flex-start;
     gap: var(--space-12);
   }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Architecture canvas (Step 9m)
+ *
+ * The workspace centre is a focused architecture diagram, not a report.
+ * The canvas is a dotted-grid surface that hosts an SVG edge layer
+ * underneath HTML/CSS nodes. The nodes are absolutely positioned by
+ * ArchitectureBoard based on a deterministic layered layout (client →
+ * gateway → service → data → external), and the SVG edge layer either
+ * uses real edges from the backend or falls back to inferred high-level
+ * edges between layers.
+ *
+ * The previous lane/tradeoff/profile/report classes were deleted —
+ * those were only used by the old report-style board and have no
+ * remaining callers.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.architecture-canvas {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.architecture-canvas-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  padding: 0 var(--space-4);
+}
+
+.architecture-canvas-title {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-right: var(--space-4);
+}
+
+.architecture-canvas-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-6);
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.architecture-canvas-chip strong {
+  color: var(--text-primary);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  font-family: var(--font-sans);
+}
+
+.architecture-canvas-grid {
+  flex: 1 1 auto;
+  position: relative;
+  min-height: 620px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background-color: #fff;
+  background-image: radial-gradient(
+    circle,
+    rgba(28, 28, 30, 0.08) 1px,
+    transparent 1px
+  );
+  background-size: 18px 18px;
+  background-position: 0 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.architecture-diagram-stage {
+  position: relative;
+  /* width/height are set inline from the computed diagram model */
+}
+
+.architecture-diagram-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.architecture-diagram-edge {
+  stroke: rgba(28, 28, 30, 0.3);
+  stroke-width: 1.2;
+  fill: none;
+}
+
+.architecture-diagram-node {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+  padding: var(--space-8) var(--space-12);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: 0 1px 2px rgba(28, 28, 30, 0.04),
+    0 4px 12px rgba(28, 28, 30, 0.04);
+  transition: border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+.architecture-diagram-node:hover {
+  border-color: var(--text-primary);
+  box-shadow: 0 1px 2px rgba(28, 28, 30, 0.06),
+    0 6px 18px rgba(28, 28, 30, 0.08);
+}
+
+/* Layer accents — kept very subtle so the canvas reads as one diagram,
+ * not a colour-coded chart. Only the service column (the application
+ * core) gets the brand accent. */
+.architecture-diagram-node--client {
+  border-left-color: var(--text-muted);
+}
+.architecture-diagram-node--gateway {
+  border-left-color: var(--text-secondary);
+}
+.architecture-diagram-node--service {
+  border-left-color: var(--accent);
+}
+.architecture-diagram-node--data {
+  border-left-color: var(--text-primary);
+}
+.architecture-diagram-node--external {
+  border-left-color: var(--border-strong);
+}
+
+.architecture-diagram-node-title {
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  line-height: 1.3;
+  color: var(--text-primary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+.architecture-diagram-node-meta {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.architecture-diagram-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-24);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
