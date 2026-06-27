@@ -2798,6 +2798,257 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Onboarding flow (Step 9j / 9k) — standalone full-viewport surface.
+ *
+ * The onboarding screen owns the discovery → questions → requirements →
+ * architecture preview pipeline. It is rendered ABOVE the dashboard
+ * shell so the main Sidebar/Topbar are not visible while the user is in
+ * onboarding. We reuse .discovery-quest-shell / .wiz-btn / tokens for
+ * the inner content — the .onboarding-* classes here add the standalone
+ * frame, the empty card, and an unobtrusive fade-in on entry.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.onboarding-standalone {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-app);
+  animation: onboarding-enter var(--dur-slow) var(--ease-out);
+}
+
+.onboarding-standalone-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding: var(--space-14) var(--space-24);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.onboarding-standalone-brand,
+.workspace-standalone-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-10);
+  min-width: 0;
+}
+
+.onboarding-standalone-brand-mark,
+.workspace-standalone-brand-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  background: var(--surface-dark);
+  color: var(--text-on-dark);
+  font: var(--weight-semibold) 15px / 1 var(--font-mono);
+  letter-spacing: 0;
+}
+
+.onboarding-standalone-brand-text,
+.workspace-standalone-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.onboarding-standalone-brand-name,
+.workspace-standalone-brand-name {
+  font-size: 13.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.onboarding-standalone-brand-sub,
+.workspace-standalone-brand-sub {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.onboarding-standalone-main {
+  flex: 1 1 auto;
+  display: flex;
+  justify-content: center;
+  padding: var(--space-32) var(--space-24);
+  width: 100%;
+}
+
+.onboarding-standalone-main > .onboarding-shell {
+  width: 100%;
+  max-width: 880px;
+}
+.onboarding-shell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+  margin-top: var(--space-8);
+  animation: onboarding-enter var(--dur-slow) var(--ease-out);
+}
+
+@keyframes onboarding-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.onboarding-bridge {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-12) var(--space-16);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+
+.onboarding-bridge-copy {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.onboarding-empty {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-28);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  max-width: 640px;
+  margin: var(--space-16) auto;
+}
+
+.home-input-error {
+  margin: var(--space-6) 0 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--accent);
+}
+
+@media (max-width: 720px) {
+  .onboarding-bridge {
+    padding: var(--space-10) var(--space-12);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+ * Architecture workspace (Step 9i / 9k) — standalone full-viewport
+ * internal workspace surface.
+ *
+ * Rendered ABOVE the dashboard shell so the main Sidebar/Topbar are not
+ * visible. The standalone wrapper carries the workspace's own brand
+ * header + back-to-dashboard action, and the body is a 3-column grid
+ * (rail | main board | copilot). On <= 1100px the copilot stacks under
+ * the board. On <= 720px the rail collapses to a horizontal strip.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.workspace-standalone {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-app);
+}
+
+.workspace-standalone-header {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-16);
+  padding: var(--space-14) var(--space-24);
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.workspace-standalone-body {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: minmax(200px, 220px) minmax(0, 1fr) minmax(320px, 360px);
+  gap: var(--space-20);
+  padding: var(--space-20) var(--space-24);
+  align-items: start;
+}
+
+.workspace-standalone-body:has(.workspace-rail--collapsed) {
+  grid-template-columns: 72px minmax(0, 1fr) minmax(320px, 360px);
+}
+
+.workspace-standalone-body--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-48) var(--space-24);
+}
+
+.workspace-standalone-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-16);
+}
+
+/* Within the standalone surface, the rail and copilot stick to the top
+ * of the viewport just under the sticky brand header. */
+.workspace-standalone-body .workspace-rail,
+.workspace-standalone-body .workspace-chat-panel {
+  position: sticky;
+  top: calc(64px + var(--space-12));
+}
+
+@media (max-width: 1100px) {
+  .workspace-standalone-body,
+  .workspace-standalone-body:has(.workspace-rail--collapsed) {
+    grid-template-columns: minmax(200px, 220px) minmax(0, 1fr);
+  }
+  .workspace-standalone-body:has(.workspace-rail--collapsed) {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+  .workspace-standalone-body .workspace-chat-panel {
+    grid-column: 1 / -1;
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-standalone-header,
+  .onboarding-standalone-header {
+    padding: var(--space-10) var(--space-14);
+  }
+  .workspace-standalone-body,
+  .workspace-standalone-body:has(.workspace-rail--collapsed) {
+    grid-template-columns: 1fr;
+    padding: var(--space-12) var(--space-14);
+  }
+  .workspace-standalone-body .workspace-rail {
+    position: static;
+  }
+  .onboarding-standalone-main {
+    padding: var(--space-20) var(--space-14);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Architecture workspace (Step 9i) — internal workspace layout.
  *
  * Lives inside the existing dashboard shell (Sidebar + Topbar stay

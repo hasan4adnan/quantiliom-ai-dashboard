@@ -32,6 +32,7 @@ export type Route =
   | "settings"
   | "terms"
   | "privacy"
+  | "onboarding"
   | "workspace";
 
 const ROUTES: readonly Route[] = [
@@ -46,6 +47,7 @@ const ROUTES: readonly Route[] = [
   "settings",
   "terms",
   "privacy",
+  "onboarding",
   "workspace",
 ];
 

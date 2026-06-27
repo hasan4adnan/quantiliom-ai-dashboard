@@ -22,6 +22,7 @@ const ROUTE_LABEL: Record<Route, string> = {
   settings: "Settings",
   terms: "Terms of Service",
   privacy: "Privacy Policy",
+  onboarding: "AI Discovery",
   workspace: "Architecture Workspace",
 };
 

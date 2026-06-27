@@ -14,6 +14,9 @@ import PrivacyPage from "./pages/PrivacyPage";
 import ArchitectureWorkspace, {
   type WorkspaceState,
 } from "./pages/ArchitectureWorkspace";
+import OnboardingFlow, {
+  type OnboardingSeed,
+} from "./pages/OnboardingFlow";
 import { useRoute, type Route } from "./lib/router";
 import type { LocalUser } from "./lib/api";
 import { auth, signOut, type User } from "./lib/firebase";
@@ -80,11 +83,11 @@ function ComingSoonPage({ route, onBack }: { route: Route; onBack: () => void })
 
 // Routes that should keep a different sidebar item active (e.g. /#upgrade
 // is a sub-flow of Subscription, not its own top-level destination).
-// The architecture workspace is opened from the Home flow and isn't a
-// top-level destination, so keep Home highlighted while the user is
-// inside it.
+// Onboarding and the architecture workspace are sub-flows of Home, so
+// keep Home highlighted while the user is inside either of them.
 const SIDEBAR_ACTIVE: Partial<Record<Route, Route>> = {
   upgrade: "subscription",
+  onboarding: "home",
   workspace: "home",
 };
 
@@ -110,8 +113,7 @@ function renderPage(args: {
   fbUser: User;
   localUser: LocalUser;
   onSignOut: () => void;
-  workspaceState: WorkspaceState | null;
-  onOpenArchitectureWorkspace: (state: WorkspaceState) => void;
+  onStartOnboarding: (description: string) => void;
 }) {
   const {
     route,
@@ -121,26 +123,20 @@ function renderPage(args: {
     fbUser,
     localUser,
     onSignOut,
-    workspaceState,
-    onOpenArchitectureWorkspace,
+    onStartOnboarding,
   } = args;
   if (route === "home") {
     return (
       <DashboardHome
         firstName={firstNameFrom(deriveDisplayName(fbUser, localUser))}
-        getIdToken={() => fbUser.getIdToken()}
-        onOpenArchitectureWorkspace={onOpenArchitectureWorkspace}
+        onStartOnboarding={onStartOnboarding}
       />
     );
   }
-  if (route === "workspace") {
-    return (
-      <ArchitectureWorkspace
-        state={workspaceState}
-        onBackToHome={() => navigate("home")}
-      />
-    );
-  }
+  // NOTE: `onboarding` and `workspace` are NOT handled here. They render
+  // as full-screen standalone surfaces above the dashboard shell — see
+  // the early returns in `Shell` below. Including them here would put
+  // the Sidebar/Topbar around them, which is exactly what we don't want.
   if (route === "projects") return <ProjectsPage onNavigate={navigate} />;
   if (route === "subscription") return <SubscriptionPage onNavigate={navigate} />;
   if (route === "upgrade") {
@@ -173,11 +169,28 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState | null>(
     null
   );
+  // Onboarding seed is the brief the user typed on Home. Same
+  // in-memory-only policy as workspaceState: refresh clears it, the
+  // onboarding screen shows an empty state with a back-to-Home button.
+  const [onboardingSeed, setOnboardingSeed] = useState<OnboardingSeed | null>(
+    null
+  );
 
   const openArchitectureWorkspace = useCallback(
     (state: WorkspaceState) => {
       setWorkspaceState(state);
       navigate("workspace");
+    },
+    [navigate]
+  );
+
+  const startOnboarding = useCallback(
+    (description: string) => {
+      setOnboardingSeed({
+        description,
+        openedAt: new Date().toISOString(),
+      });
+      navigate("onboarding");
     },
     [navigate]
   );
@@ -210,6 +223,34 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
 
   const email = localUser.email || fbUser.email || "";
   const sidebarActive = SIDEBAR_ACTIVE[route] ?? route;
+
+  // Standalone full-viewport surfaces — these bypass the dashboard
+  // shell entirely so the user sees a dedicated AI Discovery / Workspace
+  // experience instead of nested chrome (main Sidebar + main Topbar +
+  // workspace rail). Auth is still enforced because we are inside
+  // <AuthGate> in PublicRouter.
+  if (route === "onboarding") {
+    return (
+      <PageTransition pageKey="onboarding">
+        <OnboardingFlow
+          seed={onboardingSeed}
+          getIdToken={() => fbUser.getIdToken()}
+          onBackHome={() => navigate("home")}
+          onOpenArchitectureWorkspace={openArchitectureWorkspace}
+        />
+      </PageTransition>
+    );
+  }
+  if (route === "workspace") {
+    return (
+      <PageTransition pageKey="workspace">
+        <ArchitectureWorkspace
+          state={workspaceState}
+          onBackToHome={() => navigate("home")}
+        />
+      </PageTransition>
+    );
+  }
 
   return (
     <div className="app-shell">
@@ -248,8 +289,7 @@ function Shell({ fbUser, localUser }: { fbUser: User; localUser: LocalUser }) {
                 fbUser,
                 localUser,
                 onSignOut: handleSignOut,
-                workspaceState,
-                onOpenArchitectureWorkspace: openArchitectureWorkspace,
+                onStartOnboarding: startOnboarding,
               })}
             </PageTransition>
           </div>
