@@ -24,7 +24,8 @@ export type RailItemKey =
   | "tech-stack"
   | "cost-estimate"
   | "alternatives"
-  | "roadmap";
+  | "roadmap"
+  | "backlog";
 
 export type RailItem = {
   key: RailItemKey;
@@ -40,6 +41,7 @@ const ITEMS: RailItem[] = [
   { key: "cost-estimate", label: "Cost Estimate" },
   { key: "alternatives", label: "Alternatives" },
   { key: "roadmap", label: "Roadmap" },
+  { key: "backlog", label: "Backlog" },
 ];
 
 type Props = {

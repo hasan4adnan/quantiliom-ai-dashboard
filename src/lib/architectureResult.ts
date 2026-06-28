@@ -759,6 +759,32 @@ export type NormalizedRoadmap = {
   summary: string | null;
 };
 
+/**
+ * A single actionable backlog item. The Backlog board groups these by
+ * `epic` (or `phase` when no epic is present) so we can render Jira-/
+ * Linear-style epic columns without any persistence or editing.
+ */
+export type NormalizedBacklogItem = {
+  id: string;
+  title: string;
+  description: string | null;
+  /** Epic or phase the item belongs to. Used as the grouping key. */
+  epic: string | null;
+  phase: string | null;
+  /** Free-form type tag — "Setup", "Feature", "Integration", "QA"… */
+  type: string | null;
+  /** Free-form priority tag — "Must-have", "Should-have", "Later"… */
+  priority: string | null;
+  category: string | null;
+  acceptanceCriteria: string[];
+};
+
+export type NormalizedBacklog = {
+  items: NormalizedBacklogItem[];
+  /** Optional top-level prose summary the engine emitted alongside items. */
+  summary: string | null;
+};
+
 export type NormalizedArchitecture = {
   /** The selected architecture's core fields, ready for direct rendering. */
   architecture: Record<string, unknown> | null;
@@ -809,6 +835,13 @@ export type NormalizedArchitecture = {
    * deterministic, locally-generated plan in that case.
    */
   roadmap: NormalizedRoadmap | null;
+  /**
+   * Structured backlog pulled from any of the supported paths. Null
+   * when the engine emitted nothing the extractor recognised — the
+   * Backlog board then derives a deterministic backlog from the
+   * (engine or fallback) roadmap and other workspace signals.
+   */
+  backlog: NormalizedBacklog | null;
 };
 
 /**
@@ -1223,6 +1256,214 @@ export function extractRoadmap(
     const v = src[key];
     if (v === undefined || v === null) continue;
     const result = readRoadmapValue(v);
+    if (result) return result;
+  }
+  return null;
+}
+
+/**
+ * Property names that may carry a backlog / task list on the
+ * architecture (or wrapper/recommendation/alternative) object. The
+ * backend doesn't emit one today; the list mirrors the spec so the
+ * extractor lights up as soon as any export shape lands upstream.
+ */
+const BACKLOG_KEYS: string[] = [
+  "backlog",
+  "tasks",
+  "workItems",
+  "tickets",
+  "userStories",
+  "stories",
+  "epics",
+  "implementationTasks",
+  "projectTasks",
+  "jiraBacklog",
+  "linearBacklog",
+];
+
+function readBacklogItemValue(
+  raw: unknown,
+  index: number,
+  epicHint: string | null
+): NormalizedBacklogItem | null {
+  const asStr = asString(raw);
+  if (asStr) {
+    return {
+      id: `item-${index + 1}`,
+      title: asStr,
+      description: null,
+      epic: epicHint,
+      phase: null,
+      type: null,
+      priority: null,
+      category: null,
+      acceptanceCriteria: [],
+    };
+  }
+  const obj = asObject(raw);
+  if (!obj) return null;
+  const title =
+    asString(obj.title) ??
+    asString(obj.name) ??
+    asString(obj.task) ??
+    asString(obj.story) ??
+    asString(obj.summary) ??
+    asString(obj.label);
+  if (!title) return null;
+  const description =
+    asString(obj.description) ??
+    asString(obj.details) ??
+    asString(obj.detail) ??
+    asString(obj.rationale);
+  // Promote `summary` to description only when the title came from
+  // somewhere else, so we don't render the same string twice.
+  const finalDescription =
+    description ??
+    (asString(obj.summary) && asString(obj.summary) !== title
+      ? asString(obj.summary)
+      : null);
+  const epic = asString(obj.epic) ?? epicHint;
+  const phase =
+    asString(obj.phase) ??
+    asString(obj.milestone) ??
+    asString(obj.stage);
+  const type =
+    asString(obj.type) ??
+    asString(obj.kind) ??
+    asString(obj.workType);
+  const priority =
+    asString(obj.priority) ??
+    asString(obj.importance) ??
+    asString(obj.severity);
+  const category =
+    asString(obj.category) ??
+    asString(obj.tag) ??
+    asString(obj.area);
+  const ac =
+    asStringArray(obj.acceptanceCriteria).length > 0
+      ? asStringArray(obj.acceptanceCriteria)
+      : asStringArray(obj.acceptance).length > 0
+        ? asStringArray(obj.acceptance)
+        : asStringArray(obj.criteria);
+  return {
+    id:
+      asString(obj.id) ??
+      asString(obj.key) ??
+      `item-${index + 1}`,
+    title,
+    description: finalDescription,
+    epic,
+    phase,
+    type,
+    priority,
+    category,
+    acceptanceCriteria: ac,
+  };
+}
+
+function readBacklogValue(raw: unknown): NormalizedBacklog | null {
+  // 1. Plain string — promote to a one-item backlog so the page still
+  //    shows something useful (rare path; mostly defensive).
+  const asStr = asString(raw);
+  if (asStr) {
+    return {
+      summary: asStr,
+      items: [],
+    };
+  }
+
+  // 2. Array form — each element is either an item or an epic-wrapper
+  //    with nested items.
+  if (Array.isArray(raw)) {
+    const allStrings = raw.every((x) => typeof x === "string");
+    if (allStrings) {
+      const items: NormalizedBacklogItem[] = [];
+      for (const s of raw as string[]) {
+        const trimmed = s.trim();
+        if (!trimmed) continue;
+        const item = readBacklogItemValue(trimmed, items.length, null);
+        if (item) items.push(item);
+      }
+      if (items.length === 0) return null;
+      return { items, summary: null };
+    }
+    const items: NormalizedBacklogItem[] = [];
+    for (const entry of raw) {
+      const obj = asObject(entry);
+      // Epic wrappers — `{ epic|name|title, tasks|stories|items }`.
+      if (obj) {
+        const nestedSources = [
+          obj.tasks,
+          obj.stories,
+          obj.items,
+          obj.workItems,
+          obj.work_items,
+        ];
+        const nested = nestedSources.find(
+          (v) => Array.isArray(v) && v.length > 0
+        );
+        if (Array.isArray(nested) && nested.length > 0) {
+          const epicTitle =
+            asString(obj.epic) ??
+            asString(obj.name) ??
+            asString(obj.title) ??
+            asString(obj.label);
+          for (const t of nested) {
+            const item = readBacklogItemValue(t, items.length, epicTitle);
+            if (item) items.push(item);
+          }
+          continue;
+        }
+      }
+      const item = readBacklogItemValue(entry, items.length, null);
+      if (item) items.push(item);
+    }
+    if (items.length === 0) return null;
+    return { items, summary: null };
+  }
+
+  // 3. Object form — `{ epics|tasks|stories|items|backlog, summary }`.
+  const obj = asObject(raw);
+  if (!obj) return null;
+  const summary =
+    asString(obj.summary) ??
+    asString(obj.description) ??
+    asString(obj.overview);
+  const itemSources = [
+    obj.epics,
+    obj.tasks,
+    obj.stories,
+    obj.items,
+    obj.backlog,
+    obj.workItems,
+    obj.work_items,
+  ];
+  let itemList: unknown[] | null = null;
+  for (const src of itemSources) {
+    if (Array.isArray(src) && src.length > 0) {
+      itemList = src;
+      break;
+    }
+  }
+  if (!itemList) {
+    if (summary) return { items: [], summary };
+    return null;
+  }
+  const inner = readBacklogValue(itemList);
+  if (!inner) {
+    if (summary) return { items: [], summary };
+    return null;
+  }
+  return { items: inner.items, summary };
+}
+
+export function extractBacklog(
+  src: Record<string, unknown>
+): NormalizedBacklog | null {
+  for (const key of BACKLOG_KEYS) {
+    const v = src[key];
+    if (v === undefined || v === null) continue;
+    const result = readBacklogValue(v);
     if (result) return result;
   }
   return null;
@@ -1702,6 +1943,7 @@ export function normalizeArchitectureResult(
       techStackMentions: [],
       cost: null,
       roadmap: null,
+      backlog: null,
     };
   }
 
@@ -1748,6 +1990,7 @@ export function normalizeArchitectureResult(
       ),
       cost: findFirstTruthy(techSources, extractCost),
       roadmap: findFirstTruthy(techSources, extractRoadmap),
+      backlog: findFirstTruthy(techSources, extractBacklog),
     };
   }
 
@@ -1823,6 +2066,7 @@ export function normalizeArchitectureResult(
     techStackMentions: extractMentionedTechnologies(fallbackText),
     cost: findFirstTruthy(techSources, extractCost),
     roadmap: findFirstTruthy(techSources, extractRoadmap),
+    backlog: findFirstTruthy(techSources, extractBacklog),
   };
 }
 

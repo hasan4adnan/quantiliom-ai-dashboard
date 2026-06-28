@@ -8574,6 +8574,348 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Backlog workspace board (Step 9t)
+ *
+ * Read-only Jira-/Linear-style view of the implementation work. Same
+ * workspace visual language as the other boards. Items are grouped by
+ * epic (or phase); each item card shows a type chip and a priority
+ * chip, plus optional description / category / acceptance criteria.
+ * No persistence, no drag-and-drop, no editing, no export — this is
+ * purely a render of the data the workspace already has.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.backlog-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  min-width: 0;
+}
+
+.backlog-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.backlog-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.backlog-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.backlog-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.backlog-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.backlog-source-note {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.backlog-summary-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-20);
+}
+
+.backlog-summary-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  max-width: 72ch;
+}
+
+/* Stats strip: total + per-priority counts. Each pill carries a tiny
+ * left accent so the priority levels read at a glance without
+ * over-decorating the row. */
+.backlog-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+}
+
+.backlog-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-6);
+  padding: var(--space-8) var(--space-12);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--surface-card);
+}
+
+.backlog-stat-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.backlog-stat-value {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.backlog-stat--must {
+  border-left: 3px solid var(--accent);
+}
+
+.backlog-stat--should {
+  border-left: 3px solid var(--text-secondary);
+}
+
+.backlog-stat--later {
+  border-left: 3px solid var(--gray-300);
+}
+
+/* Groups (epics / phases). Single column on narrow, auto-fill on
+ * wider so two epic columns can sit side-by-side at workspace width. */
+.backlog-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-16);
+}
+
+.backlog-group {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.backlog-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.backlog-group-name {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.008em;
+}
+
+.backlog-group-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.backlog-item-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.backlog-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding: var(--space-10) var(--space-12);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+
+.backlog-item-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.backlog-item-title {
+  font-size: 13.5px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  line-height: 1.4;
+  min-width: 0;
+}
+
+.backlog-item-chips {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.backlog-item-desc {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.backlog-item-cat {
+  align-self: flex-start;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+/* Type chip — neutral border for the default vocabulary; specific
+ * type words get a subtle accent so the most common categories are
+ * scannable without becoming loud. */
+.backlog-type-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-card);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.backlog-type-chip--security {
+  border-color: rgba(239, 111, 46, 0.35);
+  color: var(--accent);
+}
+
+.backlog-type-chip--integration {
+  border-color: rgba(61, 58, 57, 0.35);
+  color: var(--text-primary);
+}
+
+.backlog-type-chip--qa {
+  border-color: var(--gray-300);
+}
+
+.backlog-type-chip--optimization {
+  border-color: var(--gray-300);
+  color: var(--text-secondary);
+}
+
+/* Priority chip — three levels, calm chromatic encoding. Anything we
+ * don't recognise stays neutral. */
+.backlog-priority-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--gray-100);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.backlog-priority-chip--0 {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.backlog-priority-chip--1 {
+  background: var(--gray-150);
+  color: var(--text-primary);
+}
+
+.backlog-priority-chip--2 {
+  background: var(--gray-100);
+  color: var(--text-muted);
+}
+
+.backlog-ac {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--space-6);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.backlog-ac-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.backlog-ac-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.backlog-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
+/* Single-column groups on narrow viewports so the item cards keep
+ * usable width. */
+@media (max-width: 720px) {
+  .backlog-groups {
+    grid-template-columns: 1fr;
+  }
+  .backlog-item-head {
+    flex-direction: column;
+  }
+  .backlog-item-chips {
+    align-self: flex-start;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Workspace Copilot — collapsible drawer (Step 9o)
  *
  * Copilot no longer permanently consumes a right column. A small pill

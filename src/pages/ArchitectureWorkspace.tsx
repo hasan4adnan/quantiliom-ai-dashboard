@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import AlternativesBoard from "../components/AlternativesBoard";
 import ArchitectureBoard from "../components/ArchitectureBoard";
+import BacklogBoard from "../components/BacklogBoard";
 import CostEstimateBoard from "../components/CostEstimateBoard";
 import RequirementsBoard from "../components/RequirementsBoard";
 import RoadmapBoard from "../components/RoadmapBoard";
@@ -149,8 +150,13 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
               <CostEstimateBoard architecture={state.architecture} />
             ) : activeSection === "alternatives" ? (
               <AlternativesBoard architecture={state.architecture} />
-            ) : (
+            ) : activeSection === "roadmap" ? (
               <RoadmapBoard
+                architecture={state.architecture}
+                requirements={state.requirements}
+              />
+            ) : (
+              <BacklogBoard
                 architecture={state.architecture}
                 requirements={state.requirements}
               />
