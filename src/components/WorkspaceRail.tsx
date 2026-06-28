@@ -20,6 +20,7 @@ import { useState } from "react";
 
 export type RailItemKey =
   | "architecture"
+  | "requirements"
   | "tech-stack"
   | "cost-estimate"
   | "alternatives";
@@ -33,6 +34,7 @@ export type RailItem = {
 
 const ITEMS: RailItem[] = [
   { key: "architecture", label: "Architecture" },
+  { key: "requirements", label: "Requirements" },
   { key: "tech-stack", label: "Tech Stack" },
   { key: "cost-estimate", label: "Cost Estimate" },
   { key: "alternatives", label: "Alternatives" },

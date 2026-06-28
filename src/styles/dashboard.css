@@ -8013,6 +8013,269 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Requirements workspace board (Step 9r)
+ *
+ * Shows the normalized product requirements that drove the architecture
+ * decision. Visual language matches the rest of the workspace — same
+ * header/eyebrow/title/sub treatment as Tech Stack / Cost Estimate /
+ * Alternatives, same neutral card surfaces, same mono-uppercase compact
+ * labels. The brief card is the only section with a left accent strip,
+ * mirroring the Alternatives "recommended" card.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.requirements-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  min-width: 0;
+}
+
+.requirements-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.requirements-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.requirements-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.requirements-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.requirements-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+.req-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.req-section-name {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.req-section-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Product brief — wide card with a subtle accent strip. */
+.req-brief-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.req-brief-card--empty {
+  border-left-color: var(--border-default);
+}
+
+.req-brief-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.req-brief-card--empty .req-brief-eyebrow {
+  color: var(--text-muted);
+}
+
+.req-brief-text {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  max-width: 72ch;
+}
+
+.req-brief-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-muted);
+}
+
+/* Core requirements grid — compact cards keyed by field name. */
+.req-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-12);
+}
+
+.req-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-14);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.req-card-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.req-card-value {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+  word-break: break-word;
+}
+
+.req-card-chips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.req-card-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Chip styles — small for inside cards, large for standalone lists. */
+.req-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  font-size: 11.5px;
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.req-chip--lg {
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12.5px;
+}
+
+.req-chip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+/* Assumptions / open-items lists — compact bulleted text. */
+.req-note-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.req-note {
+  position: relative;
+  padding: var(--space-10) var(--space-14) var(--space-10) var(--space-24);
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.req-note::before {
+  content: "";
+  position: absolute;
+  left: var(--space-12);
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin-top: -2px;
+  border-radius: 50%;
+  background: var(--border-strong);
+}
+
+/* Open items deserve a slightly louder treatment because each row is
+ * something the user may need to act on before relying on the
+ * architecture. Keep it restrained — accent-tinted bullet, not a full
+ * card wash. */
+.req-note-list--unresolved .req-note {
+  border-color: var(--accent-soft-strong);
+  background: var(--surface-card);
+}
+
+.req-note-list--unresolved .req-note::before {
+  background: var(--accent);
+}
+
+.req-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
+.req-empty--inline {
+  padding: var(--space-16) var(--space-20);
+  text-align: left;
+  font-size: 13px;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Workspace Copilot — collapsible drawer (Step 9o)
  *
  * Copilot no longer permanently consumes a right column. A small pill

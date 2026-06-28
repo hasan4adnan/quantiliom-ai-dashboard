@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import AlternativesBoard from "../components/AlternativesBoard";
 import ArchitectureBoard from "../components/ArchitectureBoard";
 import CostEstimateBoard from "../components/CostEstimateBoard";
+import RequirementsBoard from "../components/RequirementsBoard";
 import TechStackBoard from "../components/TechStackBoard";
 import WorkspaceChatPanel from "../components/WorkspaceChatPanel";
 import WorkspaceRail, { type RailItemKey } from "../components/WorkspaceRail";
@@ -139,6 +140,8 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
                 architecture={state.architecture}
                 brief={state.brief}
               />
+            ) : activeSection === "requirements" ? (
+              <RequirementsBoard requirements={state.requirements} />
             ) : activeSection === "tech-stack" ? (
               <TechStackBoard architecture={state.architecture} />
             ) : activeSection === "cost-estimate" ? (
