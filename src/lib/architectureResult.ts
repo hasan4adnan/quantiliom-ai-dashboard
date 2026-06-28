@@ -640,10 +640,48 @@ export type ArchitectureAlternativeSummary = {
   hasMermaid: boolean;
   hasCost: boolean;
   isRecommended: boolean;
+  /**
+   * Number of architecture components in the per-alternative architecture
+   * if we could unwrap it. 0 when the alt has no nested architecture or
+   * the components array was empty.
+   */
+  componentCount: number;
+  /**
+   * Normalized cost estimate for THIS alternative (typically the wrapper's
+   * `costEstimate` field, or the inner architecture's `cost` field).
+   * Independent of the top-level `cost` returned by `normalizeArchitectureResult`.
+   */
+  cost: NormalizedCost | null;
+  /**
+   * Free-form strengths/risks/bestFor from the alternative entry itself
+   * (some shapes carry these directly). The Alternatives board prefers
+   * these when present and falls back to the matching tradeoff entry.
+   */
+  strengths: string[];
+  risks: string[];
+  bestFor: string[];
 };
 
 export type ArchitectureTradeoffEntry = {
+  /** Profile slug (e.g. "cheap_mvp") if the row is tied to a profile. */
+  profile: string | null;
+  /** Always present — either the human-friendly profile label or `label`. */
   label: string;
+  /** Short prose explanation, when the row carries one. */
+  summary: string | null;
+  strengths: string[];
+  risks: string[];
+  bestFor: string[];
+  /** Engine's canonical four dimensions, when present. */
+  relativeCost: string | null;
+  deliverySpeed: string | null;
+  scaleReadiness: string | null;
+  operationalComplexity: string | null;
+  /**
+   * Legacy combined detail string. Filled when the input was a plain
+   * string OR when no structured field is available — keeps older renderers
+   * working without forcing the new board to use it.
+   */
   detail: string | null;
 };
 
@@ -793,20 +831,47 @@ function buildAlternativeSummary(
   const profile = asString(alt.profile);
   const inner = pickNestedArchitecture(alt);
   const summary =
-    (inner ? architectureSummary(inner) : null) ??
     asString(alt.summary) ??
-    asString(alt.overview);
-  const name = asString(alt.name) ?? asString(alt.title) ?? profileLabel(profile);
+    asString(alt.overview) ??
+    asString(alt.description) ??
+    (inner ? architectureSummary(inner) : null);
+  const name =
+    asString(alt.name) ??
+    asString(alt.title) ??
+    asString(alt.label) ??
+    profileLabel(profile);
   const hasMermaid =
     asString(alt.mermaid) !== null ||
     asString(alt.diagram) !== null ||
     asObject(alt.diagram) !== null ||
     (inner ? hasMermaidArtifact(inner) : false);
-  const hasCost =
-    asObject(alt.cost) !== null ||
-    asObject(alt.costEstimate) !== null ||
-    asString(alt.costEstimate) !== null ||
-    (inner ? hasCostArtifact(inner) : false);
+  // Per-alternative cost: prefer the wrapper's costEstimate (engine's
+  // canonical location), fall back to alt.cost, then to the inner
+  // architecture's cost. The structural extractor is the same one the
+  // Cost Estimate page uses so the shape support stays consistent.
+  const costFromAlt = extractCost(alt);
+  const costFromInner = inner ? extractCost(inner) : null;
+  const cost = costFromAlt ?? costFromInner;
+  const hasCost = cost !== null;
+  // Some alternative shapes carry their own strengths/risks/bestFor
+  // directly (pros/cons/weaknesses are accepted aliases). We surface
+  // them on the summary so the board can prefer them over the matching
+  // tradeoff entry — useful when the engine emits per-alt narrative.
+  const strengths =
+    asStringArray(alt.strengths).length > 0
+      ? asStringArray(alt.strengths)
+      : asStringArray(alt.pros);
+  const risks =
+    asStringArray(alt.risks).length > 0
+      ? asStringArray(alt.risks)
+      : asStringArray(alt.weaknesses).length > 0
+        ? asStringArray(alt.weaknesses)
+        : asStringArray(alt.cons);
+  const bestFor =
+    asStringArray(alt.bestFor).length > 0
+      ? asStringArray(alt.bestFor)
+      : asStringArray(alt.best_for);
+  const componentCount = inner ? extractComponents(inner).length : 0;
   return {
     profile,
     profileLabel: profileLabel(profile),
@@ -819,6 +884,11 @@ function buildAlternativeSummary(
       profile !== null &&
       recommendedProfile !== null &&
       profile === recommendedProfile,
+    componentCount,
+    cost,
+    strengths,
+    risks,
+    bestFor,
   };
 }
 
@@ -1019,30 +1089,244 @@ export function extractCost(
   return null;
 }
 
+/**
+ * Dimension labels we recognise in the "matrix" tradeoff form, mapped to
+ * the canonical engine field they fill on the per-profile entry. Anything
+ * we don't recognise is dropped from the matrix view but still surfaced in
+ * the per-profile entry's `detail` field so the data isn't silently lost.
+ */
+const DIMENSION_FIELD_MAP: Record<
+  string,
+  "relativeCost" | "deliverySpeed" | "scaleReadiness" | "operationalComplexity"
+> = {
+  cost: "relativeCost",
+  price: "relativeCost",
+  spend: "relativeCost",
+  speed: "deliverySpeed",
+  delivery: "deliverySpeed",
+  deliveryspeed: "deliverySpeed",
+  time: "deliverySpeed",
+  timetoMarket: "deliverySpeed",
+  scale: "scaleReadiness",
+  scalability: "scaleReadiness",
+  scaleReadiness: "scaleReadiness",
+  growth: "scaleReadiness",
+  ops: "operationalComplexity",
+  operations: "operationalComplexity",
+  operational: "operationalComplexity",
+  operationalcomplexity: "operationalComplexity",
+  complexity: "operationalComplexity",
+};
+
+const PROFILE_KEY_ALIASES: Record<string, string> = {
+  cheap_mvp: "cheap_mvp",
+  cheapmvp: "cheap_mvp",
+  cheap: "cheap_mvp",
+  mvp: "cheap_mvp",
+  balanced: "balanced",
+  scale_first: "scale_first",
+  scalefirst: "scale_first",
+  scale: "scale_first",
+};
+
+function emptyTradeoffEntry(
+  profile: string | null,
+  label: string
+): ArchitectureTradeoffEntry {
+  return {
+    profile,
+    label,
+    summary: null,
+    strengths: [],
+    risks: [],
+    bestFor: [],
+    relativeCost: null,
+    deliverySpeed: null,
+    scaleReadiness: null,
+    operationalComplexity: null,
+    detail: null,
+  };
+}
+
+function buildPerProfileTradeoff(
+  row: Record<string, unknown>
+): ArchitectureTradeoffEntry | null {
+  const profile = asString(row.profile);
+  const label =
+    profileLabel(profile) ??
+    asString(row.label) ??
+    asString(row.name) ??
+    asString(row.title);
+  if (!label) return null;
+  const summary =
+    asString(row.summary) ??
+    asString(row.explanation) ??
+    asString(row.description) ??
+    asString(row.overview);
+  const strengths =
+    asStringArray(row.strengths).length > 0
+      ? asStringArray(row.strengths)
+      : asStringArray(row.pros);
+  const risks =
+    asStringArray(row.risks).length > 0
+      ? asStringArray(row.risks)
+      : asStringArray(row.weaknesses).length > 0
+        ? asStringArray(row.weaknesses)
+        : asStringArray(row.cons);
+  const bestFor =
+    asStringArray(row.bestFor).length > 0
+      ? asStringArray(row.bestFor)
+      : asStringArray(row.best_for);
+  const relativeCost = asString(row.relativeCost) ?? asString(row.cost);
+  const deliverySpeed =
+    asString(row.deliverySpeed) ?? asString(row.speed);
+  const scaleReadiness =
+    asString(row.scaleReadiness) ?? asString(row.scale);
+  const operationalComplexity =
+    asString(row.operationalComplexity) ??
+    asString(row.opsComplexity) ??
+    asString(row.complexity);
+  const notes = asStringArray(row.notes);
+  const detail = notes.length > 0 ? notes.join(" • ") : null;
+  return {
+    profile,
+    label,
+    summary,
+    strengths,
+    risks,
+    bestFor,
+    relativeCost,
+    deliverySpeed,
+    scaleReadiness,
+    operationalComplexity,
+    detail,
+  };
+}
+
+/**
+ * Pivot a dimension-keyed tradeoff matrix into per-profile entries.
+ *
+ *   [{ dimension: "Cost", cheap_mvp: "lowest", balanced: "moderate", … }]
+ *   → entries keyed by profile, each carrying the corresponding field.
+ *
+ * Dimensions we don't recognise are concatenated into each profile's
+ * `detail` so nothing is silently dropped.
+ */
+function pivotDimensionMatrix(
+  rows: Record<string, unknown>[]
+): ArchitectureTradeoffEntry[] {
+  const profileEntries = new Map<string, ArchitectureTradeoffEntry>();
+  const ensure = (profile: string): ArchitectureTradeoffEntry => {
+    const existing = profileEntries.get(profile);
+    if (existing) return existing;
+    const created = emptyTradeoffEntry(profile, profileLabel(profile) ?? profile);
+    profileEntries.set(profile, created);
+    return created;
+  };
+  const extraDetails = new Map<string, string[]>();
+  const pushExtra = (profile: string, line: string) => {
+    const arr = extraDetails.get(profile) ?? [];
+    arr.push(line);
+    extraDetails.set(profile, arr);
+  };
+
+  for (const row of rows) {
+    const dimensionRaw =
+      asString(row.dimension) ??
+      asString(row.name) ??
+      asString(row.category) ??
+      asString(row.label);
+    if (!dimensionRaw) continue;
+    const dimensionKey = dimensionRaw.toLowerCase().replace(/[\s_\-]/g, "");
+    const field = DIMENSION_FIELD_MAP[dimensionKey] ?? null;
+
+    for (const [rawKey, rawValue] of Object.entries(row)) {
+      if (
+        rawKey === "dimension" ||
+        rawKey === "name" ||
+        rawKey === "category" ||
+        rawKey === "label"
+      )
+        continue;
+      const profileKey = PROFILE_KEY_ALIASES[
+        rawKey.toLowerCase().replace(/[\s_\-]/g, "")
+      ];
+      if (!profileKey) continue;
+      const value = asString(rawValue);
+      if (!value) continue;
+      const entry = ensure(profileKey);
+      if (field) {
+        // Strict noUncheckedIndexedAccess-friendly assignment: index via
+        // the known field name (no dynamic key access on the entry).
+        if (field === "relativeCost") entry.relativeCost = value;
+        else if (field === "deliverySpeed") entry.deliverySpeed = value;
+        else if (field === "scaleReadiness") entry.scaleReadiness = value;
+        else if (field === "operationalComplexity")
+          entry.operationalComplexity = value;
+      } else {
+        pushExtra(profileKey, `${dimensionRaw}: ${value}`);
+      }
+    }
+  }
+
+  for (const [profile, lines] of extraDetails.entries()) {
+    const entry = profileEntries.get(profile);
+    if (entry) entry.detail = lines.join(" · ");
+  }
+
+  return [...profileEntries.values()];
+}
+
+function looksLikeDimensionMatrix(rows: Record<string, unknown>[]): boolean {
+  if (rows.length === 0) return false;
+  let dimensionRowCount = 0;
+  for (const row of rows) {
+    const hasDimensionKey =
+      asString(row.dimension) !== null ||
+      asString(row.category) !== null ||
+      (asString(row.name) !== null && asString(row.profile) === null);
+    if (!hasDimensionKey) continue;
+    const hasProfileColumn = Object.keys(row).some((k) => {
+      const canon = k.toLowerCase().replace(/[\s_\-]/g, "");
+      return PROFILE_KEY_ALIASES[canon] !== undefined;
+    });
+    if (hasProfileColumn) dimensionRowCount += 1;
+  }
+  return dimensionRowCount >= 1 && dimensionRowCount === rows.length;
+}
+
 function buildTradeoffs(raw: unknown): ArchitectureTradeoffEntry[] {
+  if (!Array.isArray(raw)) return [];
+
+  // 1. Array of plain strings — promote each as a generic detail-only
+  //    entry. Useful when the engine emits a short bulletted summary.
+  const allStrings = raw.every(
+    (x) => typeof x === "string" && x.trim().length > 0
+  );
+  if (allStrings) {
+    return (raw as string[])
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+      .map((s, i) => {
+        const e = emptyTradeoffEntry(null, `Note ${i + 1}`);
+        e.detail = s;
+        return e;
+      });
+  }
+
   const arr = asObjectArray(raw);
   if (arr.length === 0) return [];
+
+  // 2. Dimension matrix form — pivot into per-profile entries.
+  if (looksLikeDimensionMatrix(arr)) {
+    const pivoted = pivotDimensionMatrix(arr);
+    if (pivoted.length > 0) return pivoted;
+  }
+
+  // 3. Per-profile canonical form (one entry per profile) — this is what
+  //    the engine emits today.
   return arr
-    .map((row) => {
-      const profile = asString(row.profile);
-      const baseLabel = profileLabel(profile) ?? asString(row.label);
-      if (!baseLabel) return null;
-      const detailParts: string[] = [];
-      const cost = asString(row.relativeCost);
-      if (cost) detailParts.push(`Cost: ${prettyEnum(cost) ?? cost}`);
-      const speed = asString(row.deliverySpeed);
-      if (speed) detailParts.push(`Speed: ${prettyEnum(speed) ?? speed}`);
-      const scale = asString(row.scaleReadiness);
-      if (scale) detailParts.push(`Scale: ${prettyEnum(scale) ?? scale}`);
-      const complexity = asString(row.operationalComplexity);
-      if (complexity)
-        detailParts.push(`Ops: ${prettyEnum(complexity) ?? complexity}`);
-      const notes = asStringArray(row.notes);
-      if (notes.length > 0) detailParts.push(notes.join(" • "));
-      const explanation = asString(row.explanation) ?? asString(row.summary);
-      const detail = explanation ?? (detailParts.length > 0 ? detailParts.join(" · ") : null);
-      return { label: baseLabel, detail };
-    })
+    .map((row) => buildPerProfileTradeoff(row))
     .filter((t): t is ArchitectureTradeoffEntry => t !== null);
 }
 
@@ -1055,10 +1339,13 @@ function buildRecommendation(
   const profile =
     asString(obj?.profile) ??
     asString(obj?.recommendedProfile) ??
+    asString(obj?.choice) ??
+    asString(obj?.selectedProfile) ??
     recommendedProfile;
   const explanation =
     asString(obj?.explanation) ??
     asString(obj?.rationale) ??
+    asString(obj?.reason) ??
     asString(obj?.summary);
   const reasonCodes = obj ? asStringArray(obj.reasonCodes) : [];
   if (!profile && !explanation && reasonCodes.length === 0) return null;
@@ -1068,6 +1355,57 @@ function buildRecommendation(
     explanation,
     reasonCodes,
   };
+}
+
+/**
+ * Probe every supported path for the alternatives array and return the
+ * first non-empty hit. The order reflects spec priority: wrapper root,
+ * recommendation, root-level synonyms.
+ */
+function collectAlternativesRaw(
+  root: Record<string, unknown>,
+  recommendationObj: Record<string, unknown> | null
+): Record<string, unknown>[] {
+  const candidates: unknown[] = [
+    root.alternatives,
+    root.profiles,
+    root.options,
+    recommendationObj?.alternatives,
+    recommendationObj?.options,
+  ];
+  for (const c of candidates) {
+    const arr = asObjectArray(c);
+    if (arr.length > 0) return arr;
+  }
+  return [];
+}
+
+/**
+ * Probe every supported path for the tradeoffs array and return the
+ * first non-empty hit. Mirrors `collectAlternativesRaw` so the
+ * normalizer is shape-tolerant on both fronts.
+ */
+function collectTradeoffsRaw(
+  root: Record<string, unknown>,
+  recommendationObj: Record<string, unknown> | null,
+  selectedRawAlt: Record<string, unknown> | null
+): unknown {
+  const candidates: unknown[] = [
+    root.tradeoffs,
+    root.tradeOffs,
+    root.trade_offs,
+    recommendationObj?.tradeoffs,
+    recommendationObj?.tradeOffs,
+    selectedRawAlt?.tradeoffs,
+    selectedRawAlt?.tradeOffs,
+  ];
+  for (const c of candidates) {
+    if (c === undefined || c === null) continue;
+    if (!Array.isArray(c)) continue;
+    if (c.length === 0) continue;
+    return c;
+  }
+  return [];
 }
 
 /**
@@ -1103,14 +1441,18 @@ export function normalizeArchitectureResult(
   // already looks like a direct architecture, we treat it as direct
   // even if it happens to also carry an `alternatives` array.
   const topLevelIsArchitecture = looksLikeArchitecture(root);
+  const recommendationObj = asObject(root.recommendation);
   const recommendedProfile =
     asString(root.recommendedProfile) ??
-    asString(asObject(root.recommendation)?.profile);
-  const altsRaw = asObjectArray(root.alternatives);
+    asString(recommendationObj?.profile) ??
+    asString(recommendationObj?.recommendedProfile) ??
+    asString(recommendationObj?.choice) ??
+    asString(recommendationObj?.selectedProfile);
+  const altsRaw = collectAlternativesRaw(root, recommendationObj);
   const isWrapper =
     !topLevelIsArchitecture &&
     (recommendedProfile !== null ||
-      asObject(root.recommendation) !== null ||
+      recommendationObj !== null ||
       altsRaw.length > 0);
 
   if (!isWrapper) {
@@ -1127,7 +1469,7 @@ export function normalizeArchitectureResult(
       recommendedProfile,
       recommendedProfileLabel: profileLabel(recommendedProfile),
       alternatives,
-      tradeoffs: buildTradeoffs(root.tradeoffs),
+      tradeoffs: buildTradeoffs(collectTradeoffsRaw(root, recommendationObj, null)),
       edges: extractEdges(root),
       diagramSource: asString(root.mermaid) ?? asString(root.diagram),
       techStackItems: findFirstNonEmpty(techSources, extractTechStackItems),
@@ -1175,7 +1517,7 @@ export function normalizeArchitectureResult(
 
   const techSources = collectAuxSources(
     root,
-    asObject(root.recommendation),
+    recommendationObj,
     selectedRawAlt ?? null
   );
   // For the narrative fallback we scan the inner architecture's prose
@@ -1183,8 +1525,8 @@ export function normalizeArchitectureResult(
   // the recommendation/alternative summaries the wrapper carries.
   const fallbackText = [
     architecture ? gatherArchitectureText(architecture) : "",
-    asString(asObject(root.recommendation)?.explanation) ?? "",
-    asString(asObject(root.recommendation)?.rationale) ?? "",
+    asString(recommendationObj?.explanation) ?? "",
+    asString(recommendationObj?.rationale) ?? "",
     selectedRawAlt ? (asString(selectedRawAlt.summary) ?? "") : "",
     selectedRawAlt ? (asString(selectedRawAlt.overview) ?? "") : "",
   ]
@@ -1201,7 +1543,9 @@ export function normalizeArchitectureResult(
       profileLabel(recommendedProfile) ??
       (selected ? selected.profileLabel : null),
     alternatives,
-    tradeoffs: buildTradeoffs(root.tradeoffs),
+    tradeoffs: buildTradeoffs(
+      collectTradeoffsRaw(root, recommendationObj, selectedRawAlt ?? null)
+    ),
     edges,
     diagramSource,
     techStackItems: findFirstNonEmpty(techSources, extractTechStackItems),

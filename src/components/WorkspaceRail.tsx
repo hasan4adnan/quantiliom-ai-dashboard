@@ -18,7 +18,11 @@ import { useState } from "react";
  * the assistant.
  */
 
-export type RailItemKey = "architecture" | "tech-stack" | "cost-estimate";
+export type RailItemKey =
+  | "architecture"
+  | "tech-stack"
+  | "cost-estimate"
+  | "alternatives";
 
 export type RailItem = {
   key: RailItemKey;
@@ -31,6 +35,7 @@ const ITEMS: RailItem[] = [
   { key: "architecture", label: "Architecture" },
   { key: "tech-stack", label: "Tech Stack" },
   { key: "cost-estimate", label: "Cost Estimate" },
+  { key: "alternatives", label: "Alternatives" },
 ];
 
 type Props = {

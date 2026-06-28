@@ -7577,6 +7577,442 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Alternatives workspace board (Step 9q)
+ *
+ * Profile comparison surface. Shares the workspace visual language with
+ * Tech Stack / Cost Estimate (compact card header, mono uppercase
+ * chips, neutral surfaces). The recommended profile is highlighted via
+ * a single accent-tinted card and a subtle badge on its matching
+ * profile card — restrained, no glow, no heavy animation.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.alternatives-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  min-width: 0;
+}
+
+.alternatives-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.alternatives-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.alternatives-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.alternatives-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.alternatives-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+/* Section heading shared by the alt-grid, matrix, and tradeoff list
+ * sections so vertical rhythm stays consistent. */
+.alt-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+  margin-bottom: var(--space-12);
+}
+
+.alt-section-name {
+  font-size: 14px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.alt-section-count {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+/* Recommended profile summary card (top of board). Uses the accent
+ * tint sparingly — only the eyebrow + a thin accent strip on the left
+ * border — to keep the workspace calm. */
+.alt-recommended-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.alt-recommended-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alt-recommended-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.alt-recommended-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.012em;
+}
+
+.alt-recommended-explanation {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 72ch;
+}
+
+.alt-recommended-codes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+}
+
+.alt-recommended-codes code {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+/* Profile grid: 1 col on narrow, auto-fill on wider. We use a fixed
+ * min so the three canonical profiles fit cleanly side-by-side at
+ * usable widths but reflow gracefully when the drawer or the workspace
+ * column narrows. */
+.alt-profile-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-16);
+}
+
+.alt-profile-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+}
+
+.alt-profile-card--recommended {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+}
+
+.alt-profile-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.alt-profile-card-name {
+  font-size: 15px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.008em;
+}
+
+.alt-recommended-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-weight: var(--weight-medium);
+}
+
+.alt-profile-card-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.alt-profile-card-dims {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.alt-profile-card-dim {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+}
+
+.alt-profile-card-dim-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.alt-profile-card-dim-value {
+  font-size: 11.5px;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.alt-profile-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-12);
+  padding-top: var(--space-8);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.alt-profile-card-meta-item {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.alt-profile-card-meta-label {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.alt-profile-card-meta-value {
+  font-size: 12.5px;
+  font-weight: var(--weight-medium);
+  color: var(--text-primary);
+}
+
+.alt-profile-card-lists {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.alt-profile-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alt-profile-card-list-name {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.alt-profile-card-list ul {
+  list-style: disc;
+  padding-left: var(--space-16);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* Trade-off matrix: a compact CSS grid (1 dimension column + N profile
+ * columns). Rows are dimensions; cells carry the per-profile value. We
+ * use a single grid container for header + rows so columns align. */
+.alt-tradeoff-matrix {
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.alt-tradeoff-matrix-head,
+.alt-tradeoff-matrix-row {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.9fr) repeat(
+      auto-fit,
+      minmax(0, 1fr)
+    );
+  align-items: center;
+}
+
+.alt-tradeoff-matrix-head {
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.alt-tradeoff-matrix-corner {
+  padding: var(--space-10) var(--space-14);
+}
+
+.alt-tradeoff-matrix-col {
+  padding: var(--space-10) var(--space-14);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.alt-tradeoff-matrix-col--recommended {
+  color: var(--accent);
+}
+
+.alt-tradeoff-matrix-row {
+  border-top: 1px solid var(--border-subtle);
+}
+
+.alt-tradeoff-matrix-row:first-of-type {
+  border-top: 0;
+}
+
+.alt-tradeoff-matrix-dim {
+  padding: var(--space-10) var(--space-14);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: var(--gray-50);
+}
+
+.alt-tradeoff-matrix-cell {
+  padding: var(--space-10) var(--space-14);
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-left: 1px solid var(--border-subtle);
+}
+
+.alt-tradeoff-matrix-cell--recommended {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: var(--weight-medium);
+}
+
+/* Tradeoff list — fallback when the matrix has no structured rows but
+ * the engine still gave us prose-only notes. */
+.alt-tradeoff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+}
+
+.alt-tradeoff-note {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--space-12) var(--space-14);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.alt-tradeoff-note-label {
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.005em;
+}
+
+.alt-tradeoff-note-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.alt-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
+.alt-empty--inline {
+  padding: var(--space-20);
+}
+
+/* On narrow viewports the matrix will become hard to read; let it
+ * scroll horizontally rather than wrap awkwardly. */
+@media (max-width: 720px) {
+  .alt-tradeoff-matrix {
+    overflow-x: auto;
+  }
+  .alt-tradeoff-matrix-head,
+  .alt-tradeoff-matrix-row {
+    grid-template-columns: minmax(120px, 0.9fr) repeat(3, minmax(120px, 1fr));
+    min-width: 540px;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Workspace Copilot — collapsible drawer (Step 9o)
  *
  * Copilot no longer permanently consumes a right column. A small pill

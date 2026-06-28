@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import AlternativesBoard from "../components/AlternativesBoard";
 import ArchitectureBoard from "../components/ArchitectureBoard";
 import CostEstimateBoard from "../components/CostEstimateBoard";
 import TechStackBoard from "../components/TechStackBoard";
@@ -140,8 +141,10 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
               />
             ) : activeSection === "tech-stack" ? (
               <TechStackBoard architecture={state.architecture} />
-            ) : (
+            ) : activeSection === "cost-estimate" ? (
               <CostEstimateBoard architecture={state.architecture} />
+            ) : (
+              <AlternativesBoard architecture={state.architecture} />
             )}
           </main>
         </div>
