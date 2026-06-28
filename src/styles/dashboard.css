@@ -8574,19 +8574,20 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
- * Backlog workspace board (Step 9t)
+ * Backlog workspace board (Step 9u — dark Jira-like panel)
  *
- * Read-only Jira-/Linear-style view of the implementation work. Same
- * workspace visual language as the other boards. Items are grouped by
- * epic (or phase); each item card shows a type chip and a priority
- * chip, plus optional description / category / acceptance criteria.
- * No persistence, no drag-and-drop, no editing, no export — this is
- * purely a render of the data the workspace already has.
+ * The outer page header keeps the light workspace language; the inner
+ * "product panel" is a dark window inspired by the public website's
+ * Backlog Intelligence mockup. The dark palette is intentionally
+ * GitHub-dark-ish (#0d1117 / #161b22 / #cdd9e5) so the panel feels
+ * like a real Jira/Linear surface rather than a custom-coloured card.
+ * Read-only — there are no checkboxes, no edit affordances, no drag
+ * targets, no export buttons.
  * ═════════════════════════════════════════════════════════════════════════ */
 .backlog-board {
   display: flex;
   flex-direction: column;
-  gap: var(--space-24);
+  gap: var(--space-20);
   min-width: 0;
 }
 
@@ -8628,267 +8629,322 @@
   margin-top: var(--space-8);
 }
 
-.backlog-source-note {
-  margin: var(--space-6) 0 0;
+/* Shell — gives the dark window a bit of contrast against the light
+ * workspace surface via a soft outer shadow. */
+.backlog-shell {
+  display: block;
+}
+
+.backlog-window {
+  background: #0d1117;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+    0 18px 50px rgba(2, 2, 2, 0.18);
+  color: #e6edf3;
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-muted);
 }
 
-.backlog-summary-card {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-left: 3px solid var(--accent);
-  border-radius: var(--radius-lg);
-  padding: var(--space-16) var(--space-20);
-}
-
-.backlog-summary-text {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--text-primary);
-  max-width: 72ch;
-}
-
-/* Stats strip: total + per-priority counts. Each pill carries a tiny
- * left accent so the priority levels read at a glance without
- * over-decorating the row. */
-.backlog-stats {
+/* Topbar — three macOS-style window dots, centred title, right-aligned
+ * static tabs. The active tab uses the brand orange at low opacity so
+ * the panel doesn't get loud. */
+.backlog-window-topbar {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-8);
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: #161b22;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
-.backlog-stat {
+.backlog-window-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.backlog-window-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.backlog-window-dot--r { background: #ff5f57; }
+.backlog-window-dot--y { background: #febc2e; }
+.backlog-window-dot--g { background: #28c840; }
+
+.backlog-window-title {
+  flex: 1;
+  text-align: center;
+  font-size: 12.5px;
+  color: #6e7681;
+  letter-spacing: 0.04em;
+}
+
+.backlog-window-tabs {
+  display: inline-flex;
+  gap: 4px;
+}
+
+.backlog-tab {
+  font-size: 11.5px;
+  padding: 4px 12px;
+  border-radius: 5px;
+  color: #6e7681;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+  user-select: none;
+  cursor: default;
+}
+
+.backlog-tab--active {
+  background: rgba(239, 111, 46, 0.12);
+  color: var(--accent);
+  border-color: rgba(239, 111, 46, 0.22);
+}
+
+/* Stats line with AI-generated badge. Sits between the topbar and the
+ * backlog body; thin, scannable. */
+.backlog-stats-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-20);
+  padding: 10px 18px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.backlog-stat-cell {
   display: inline-flex;
   align-items: baseline;
-  gap: var(--space-6);
-  padding: var(--space-8) var(--space-12);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--surface-card);
+  gap: 6px;
 }
 
-.backlog-stat-label {
-  font-family: var(--font-mono);
+.backlog-stat-cell-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: #e6edf3;
+  letter-spacing: -0.02em;
+}
+
+.backlog-stat-cell-label {
   font-size: 10px;
-  letter-spacing: 0.1em;
+  color: #6e7681;
   text-transform: uppercase;
-  color: var(--text-muted);
+  letter-spacing: 0.08em;
 }
 
-.backlog-stat-value {
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  letter-spacing: -0.005em;
+.backlog-ai-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 3px 9px;
+  border-radius: 4px;
+  background: rgba(239, 111, 46, 0.1);
+  border: 1px solid rgba(239, 111, 46, 0.22);
+  color: var(--accent);
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
-.backlog-stat--must {
-  border-left: 3px solid var(--accent);
+.backlog-ai-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: inline-block;
 }
 
-.backlog-stat--should {
-  border-left: 3px solid var(--text-secondary);
+/* Body — internal vertical scroll if the backlog gets long, so the
+ * workspace page doesn't grow without bound. The panel itself stays
+ * visible above the fold. */
+.backlog-window-body {
+  padding: 4px 0 6px;
+  max-height: 640px;
+  overflow-y: auto;
 }
 
-.backlog-stat--later {
-  border-left: 3px solid var(--gray-300);
+/* Epic row */
+.backlog-epic {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-/* Groups (epics / phases). Single column on narrow, auto-fill on
- * wider so two epic columns can sit side-by-side at workspace width. */
-.backlog-groups {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: var(--space-16);
+.backlog-epic:last-child {
+  border-bottom: none;
 }
 
-.backlog-group {
-  background: var(--surface-card);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
-  padding: var(--space-16);
+.backlog-epic-head {
   display: flex;
-  flex-direction: column;
-  gap: var(--space-12);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
 }
 
-.backlog-group-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--space-8);
+.backlog-epic-chevron {
+  width: 12px;
+  text-align: center;
+  font-size: 10px;
+  color: #6e7681;
+  transform: rotate(90deg);
+  display: inline-block;
 }
 
-.backlog-group-name {
-  font-size: 15px;
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  letter-spacing: -0.008em;
-}
-
-.backlog-group-count {
-  font-family: var(--font-mono);
+.backlog-epic-id {
   font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(88, 166, 255, 0.12);
+  color: #58a6ff;
+  text-transform: uppercase;
 }
 
-.backlog-item-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-10);
-}
-
-.backlog-item {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-6);
-  padding: var(--space-10) var(--space-12);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--gray-50);
-}
-
-.backlog-item-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-8);
-}
-
-.backlog-item-title {
-  font-size: 13.5px;
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  line-height: 1.4;
+.backlog-epic-title {
+  flex: 1;
+  font-size: 13px;
+  color: #cdd9e5;
+  letter-spacing: 0.01em;
   min-width: 0;
 }
 
-.backlog-item-chips {
+.backlog-epic-meta {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 10px;
   flex-shrink: 0;
 }
 
-.backlog-item-desc {
+.backlog-epic-count {
+  font-size: 10.5px;
+  color: #6e7681;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 2px 6px;
+  border-radius: 3px;
+  letter-spacing: 0.03em;
+}
+
+.backlog-epic-points {
+  font-size: 10.5px;
+  color: #6e7681;
+  letter-spacing: 0.02em;
+}
+
+/* Task rows under an epic */
+.backlog-task-rows {
+  list-style: none;
   margin: 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text-secondary);
+  padding: 0 18px 8px 42px;
+  display: flex;
+  flex-direction: column;
 }
 
-.backlog-item-cat {
-  align-self: flex-start;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-}
-
-/* Type chip — neutral border for the default vocabulary; specific
- * type words get a subtle accent so the most common categories are
- * scannable without becoming loud. */
-.backlog-type-chip {
-  display: inline-flex;
+.backlog-task-row {
+  display: grid;
+  grid-template-columns:
+    72px              /* id */
+    minmax(0, 1fr)    /* title */
+    34px              /* priority */
+    auto              /* type */
+    auto              /* status */
+    auto              /* ac (optional) */
+    44px;             /* points */
   align-items: center;
-  padding: 2px 7px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  background: var(--surface-card);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+  gap: 10px;
+  padding: 6px 6px 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.025);
+}
+
+.backlog-task-row:last-child {
+  border-bottom: none;
+}
+
+.backlog-task-id {
+  font-size: 10.5px;
+  color: #484f58;
+  letter-spacing: 0.03em;
   white-space: nowrap;
 }
 
-.backlog-type-chip--security {
-  border-color: rgba(239, 111, 46, 0.35);
-  color: var(--accent);
-}
-
-.backlog-type-chip--integration {
-  border-color: rgba(61, 58, 57, 0.35);
-  color: var(--text-primary);
-}
-
-.backlog-type-chip--qa {
-  border-color: var(--gray-300);
-}
-
-.backlog-type-chip--optimization {
-  border-color: var(--gray-300);
-  color: var(--text-secondary);
-}
-
-/* Priority chip — three levels, calm chromatic encoding. Anything we
- * don't recognise stays neutral. */
-.backlog-priority-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--gray-100);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--text-secondary);
+.backlog-task-title {
+  font-size: 12px;
+  color: #adbac7;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.backlog-priority-chip--0 {
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.backlog-priority-chip--1 {
-  background: var(--gray-150);
-  color: var(--text-primary);
-}
-
-.backlog-priority-chip--2 {
-  background: var(--gray-100);
-  color: var(--text-muted);
-}
-
-.backlog-ac {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding-top: var(--space-6);
-  border-top: 1px dashed var(--border-subtle);
-}
-
-.backlog-ac-label {
-  font-family: var(--font-mono);
+.backlog-task-priority {
   font-size: 10px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+  text-align: center;
+  white-space: nowrap;
 }
 
-.backlog-ac-list {
-  list-style: disc;
-  margin: 0;
-  padding-left: var(--space-20);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--text-secondary);
+.backlog-priority-p0 {
+  background: rgba(248, 81, 73, 0.12);
+  color: #f85149;
+}
+
+.backlog-priority-p1 {
+  background: rgba(239, 111, 46, 0.12);
+  color: #ef6f2e;
+}
+
+.backlog-priority-p2 {
+  background: rgba(227, 179, 65, 0.12);
+  color: #e3b341;
+}
+
+.backlog-task-type {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8b949e;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+  white-space: nowrap;
+}
+
+.backlog-task-status,
+.backlog-status {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: rgba(110, 118, 129, 0.16);
+  color: #6e7681;
+  white-space: nowrap;
+}
+
+.backlog-task-ac {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 2px;
+  background: rgba(88, 166, 255, 0.1);
+  color: #58a6ff;
+  white-space: nowrap;
+}
+
+.backlog-task-points,
+.backlog-points {
+  font-size: 10.5px;
+  color: #6e7681;
+  letter-spacing: 0.02em;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .backlog-empty {
@@ -8901,17 +8957,32 @@
   background: var(--surface-card);
 }
 
-/* Single-column groups on narrow viewports so the item cards keep
- * usable width. */
+/* Narrow viewports — let task rows wrap onto two lines instead of
+ * forcing horizontal scroll. The title is the only flexible column;
+ * everything else flows underneath with smaller gutters. */
 @media (max-width: 720px) {
-  .backlog-groups {
-    grid-template-columns: 1fr;
+  .backlog-task-rows {
+    padding-left: 24px;
   }
-  .backlog-item-head {
-    flex-direction: column;
+  .backlog-task-row {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+    grid-auto-rows: auto;
+    row-gap: 4px;
   }
-  .backlog-item-chips {
-    align-self: flex-start;
+  .backlog-task-priority,
+  .backlog-task-type,
+  .backlog-task-status,
+  .backlog-task-ac,
+  .backlog-task-points {
+    grid-column: 2 / -1;
+    justify-self: start;
+    display: inline-block;
+    margin-right: 8px;
+  }
+  .backlog-task-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
 }
 
