@@ -8276,6 +8276,304 @@
 }
 
 /* ═════════════════════════════════════════════════════════════════════════
+ * Roadmap workspace board (Step 9s)
+ *
+ * Phased implementation timeline. Same workspace visual language as the
+ * other boards (Tech Stack / Cost / Requirements / Alternatives). The
+ * timeline uses a left-rail of phase numbers connected by a thin
+ * vertical line so the phasing reads at a glance without heavy
+ * chromework.
+ * ═════════════════════════════════════════════════════════════════════════ */
+.roadmap-board {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-24);
+  min-width: 0;
+}
+
+.roadmap-board-header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.roadmap-board-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.roadmap-board-title {
+  margin: 0;
+  font-size: 26px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: -0.018em;
+  line-height: 1.18;
+  color: var(--text-primary);
+}
+
+.roadmap-board-sub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+  max-width: 64ch;
+}
+
+.roadmap-board-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin-top: var(--space-8);
+}
+
+/* Subtle caption shown when the page renders the deterministic
+ * fallback plan rather than an engine-emitted roadmap. */
+.roadmap-source-note {
+  margin: var(--space-6) 0 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.roadmap-summary-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16) var(--space-20);
+}
+
+.roadmap-summary-text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  max-width: 72ch;
+}
+
+/* Vertical timeline. The left rail = a 28px column containing the
+ * phase numbers and the connector line drawn behind them. */
+.roadmap-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.roadmap-phase {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: var(--space-12);
+  padding-bottom: var(--space-20);
+}
+
+.roadmap-phase--last {
+  padding-bottom: 0;
+}
+
+/* Connector line — drawn from the phase marker down to the next one.
+ * Sits behind the marker via negative z-index relative to it. */
+.roadmap-phase::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 36px;
+  bottom: 0;
+  width: 1px;
+  background: var(--border-default);
+}
+
+.roadmap-phase--last::before {
+  display: none;
+}
+
+.roadmap-phase-marker {
+  position: relative;
+  z-index: 1;
+  width: 36px;
+  height: 36px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+}
+
+.roadmap-phase-number {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: 0;
+}
+
+.roadmap-phase-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-12);
+  min-width: 0;
+}
+
+.roadmap-phase-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-8);
+}
+
+.roadmap-phase-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.roadmap-phase-duration {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.roadmap-phase-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+/* Task list — bulleted rows. Bullet sits on the baseline of the
+ * title, description wraps under it. Category tag floats right. */
+.roadmap-task-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-8);
+}
+
+.roadmap-task {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-8);
+  padding: var(--space-8) var(--space-10);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--gray-50);
+}
+
+.roadmap-task-bullet {
+  width: 6px;
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  display: inline-block;
+}
+
+.roadmap-task-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.roadmap-task-title {
+  font-size: 13.5px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.roadmap-task-desc {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.roadmap-task-cat {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  align-self: center;
+  white-space: nowrap;
+}
+
+.roadmap-outcomes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: var(--space-8);
+  border-top: 1px dashed var(--border-subtle);
+}
+
+.roadmap-outcomes-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.roadmap-outcome-list {
+  list-style: disc;
+  margin: 0;
+  padding-left: var(--space-20);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.roadmap-empty {
+  padding: var(--space-32);
+  border: 1px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  background: var(--surface-card);
+}
+
+/* On narrow viewports stack the marker above the card so the cards
+ * keep usable width. */
+@media (max-width: 560px) {
+  .roadmap-phase {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+  .roadmap-phase::before {
+    display: none;
+  }
+  .roadmap-task {
+    grid-template-columns: 12px minmax(0, 1fr);
+  }
+  .roadmap-task-cat {
+    grid-column: 2;
+    align-self: start;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
  * Workspace Copilot — collapsible drawer (Step 9o)
  *
  * Copilot no longer permanently consumes a right column. A small pill

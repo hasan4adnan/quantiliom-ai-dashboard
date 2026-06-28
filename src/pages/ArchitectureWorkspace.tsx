@@ -3,6 +3,7 @@ import AlternativesBoard from "../components/AlternativesBoard";
 import ArchitectureBoard from "../components/ArchitectureBoard";
 import CostEstimateBoard from "../components/CostEstimateBoard";
 import RequirementsBoard from "../components/RequirementsBoard";
+import RoadmapBoard from "../components/RoadmapBoard";
 import TechStackBoard from "../components/TechStackBoard";
 import WorkspaceChatPanel from "../components/WorkspaceChatPanel";
 import WorkspaceRail, { type RailItemKey } from "../components/WorkspaceRail";
@@ -146,8 +147,13 @@ export default function ArchitectureWorkspace({ state, onBackToHome }: Props) {
               <TechStackBoard architecture={state.architecture} />
             ) : activeSection === "cost-estimate" ? (
               <CostEstimateBoard architecture={state.architecture} />
-            ) : (
+            ) : activeSection === "alternatives" ? (
               <AlternativesBoard architecture={state.architecture} />
+            ) : (
+              <RoadmapBoard
+                architecture={state.architecture}
+                requirements={state.requirements}
+              />
             )}
           </main>
         </div>

@@ -732,6 +732,33 @@ export type NormalizedCost = {
   lineItems: NormalizedCostLineItem[];
 };
 
+/**
+ * A single task inside a roadmap phase. `category` is the engine's own
+ * tagging (e.g. "data", "auth") when present — purely advisory.
+ */
+export type NormalizedRoadmapTask = {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string | null;
+};
+
+export type NormalizedRoadmapPhase = {
+  id: string;
+  title: string;
+  summary: string | null;
+  duration: string | null;
+  tasks: NormalizedRoadmapTask[];
+  outcomes: string[];
+};
+
+export type NormalizedRoadmap = {
+  /** Phases the engine emitted, in order. */
+  phases: NormalizedRoadmapPhase[];
+  /** Optional top-level prose summary the engine emitted alongside phases. */
+  summary: string | null;
+};
+
 export type NormalizedArchitecture = {
   /** The selected architecture's core fields, ready for direct rendering. */
   architecture: Record<string, unknown> | null;
@@ -774,6 +801,14 @@ export type NormalizedArchitecture = {
    * alternative's `costEstimate`). Null when no cost data was found.
    */
   cost: NormalizedCost | null;
+  /**
+   * Structured roadmap pulled from any of the supported paths
+   * (architecture / recommendation / selected alternative / derived
+   * outputs / wrapper root). Null when the engine emitted nothing the
+   * extractor recognised — the Roadmap board falls back to a
+   * deterministic, locally-generated plan in that case.
+   */
+  roadmap: NormalizedRoadmap | null;
 };
 
 /**
@@ -958,6 +993,240 @@ const COST_KEYS: string[] = [
   "monthlyCost",
   "costs",
 ];
+
+/**
+ * Property names that may carry an implementation roadmap on the
+ * architecture (or wrapper/recommendation/alternative) object. The
+ * backend doesn't emit one today; this list is forward-compatible with
+ * the planned shapes plus reasonable synonyms.
+ */
+const ROADMAP_KEYS: string[] = [
+  "roadmap",
+  "implementationRoadmap",
+  "implementationPlan",
+  "deliveryPlan",
+  "timeline",
+  "milestones",
+  "phases",
+  "plan",
+];
+
+function readRoadmapTaskValue(
+  raw: unknown,
+  phaseIdx: number,
+  taskIdx: number
+): NormalizedRoadmapTask | null {
+  const asStr = asString(raw);
+  if (asStr) {
+    return {
+      id: `phase-${phaseIdx + 1}-task-${taskIdx + 1}`,
+      title: asStr,
+      description: null,
+      category: null,
+    };
+  }
+  const obj = asObject(raw);
+  if (!obj) return null;
+  const title =
+    asString(obj.title) ??
+    asString(obj.name) ??
+    asString(obj.label) ??
+    asString(obj.task) ??
+    asString(obj.step) ??
+    asString(obj.summary);
+  if (!title) return null;
+  const description =
+    asString(obj.description) ??
+    asString(obj.details) ??
+    asString(obj.detail) ??
+    asString(obj.rationale);
+  // `summary` is preferred for the title; if title came from elsewhere,
+  // promote `summary` to the description so we don't lose it.
+  const finalDescription =
+    description ??
+    (asString(obj.summary) && asString(obj.summary) !== title
+      ? asString(obj.summary)
+      : null);
+  const category =
+    asString(obj.category) ??
+    asString(obj.tag) ??
+    asString(obj.type) ??
+    asString(obj.area);
+  return {
+    id:
+      asString(obj.id) ??
+      asString(obj.key) ??
+      `phase-${phaseIdx + 1}-task-${taskIdx + 1}`,
+    title,
+    description: finalDescription,
+    category,
+  };
+}
+
+function readRoadmapPhaseValue(
+  raw: unknown,
+  index: number
+): NormalizedRoadmapPhase | null {
+  const asStr = asString(raw);
+  if (asStr) {
+    // A bare string phase has no tasks; treat the string itself as the
+    // phase title so the timeline still shows something useful.
+    return {
+      id: `phase-${index + 1}`,
+      title: asStr,
+      summary: null,
+      duration: null,
+      tasks: [],
+      outcomes: [],
+    };
+  }
+  const obj = asObject(raw);
+  if (!obj) return null;
+  const title =
+    asString(obj.title) ??
+    asString(obj.name) ??
+    asString(obj.label) ??
+    asString(obj.phase) ??
+    asString(obj.milestone) ??
+    asString(obj.stage);
+  if (!title) return null;
+  const summary =
+    asString(obj.summary) ??
+    asString(obj.description) ??
+    asString(obj.goal) ??
+    asString(obj.overview);
+  const duration =
+    asString(obj.duration) ?? asString(obj.timeline) ?? asString(obj.timeframe);
+  const taskSources = [
+    obj.tasks,
+    obj.items,
+    obj.steps,
+    obj.deliverables,
+    obj.workItems,
+    obj.work_items,
+  ];
+  let rawTasks: unknown[] = [];
+  for (const src of taskSources) {
+    if (Array.isArray(src) && src.length > 0) {
+      rawTasks = src;
+      break;
+    }
+  }
+  const tasks: NormalizedRoadmapTask[] = [];
+  for (let i = 0; i < rawTasks.length; i++) {
+    const t = readRoadmapTaskValue(rawTasks[i], index, tasks.length);
+    if (t) tasks.push(t);
+  }
+  const outcomes =
+    asStringArray(obj.outcomes).length > 0
+      ? asStringArray(obj.outcomes)
+      : asStringArray(obj.deliverables);
+  return {
+    id: asString(obj.id) ?? asString(obj.key) ?? `phase-${index + 1}`,
+    title,
+    summary,
+    duration,
+    tasks,
+    outcomes,
+  };
+}
+
+function readRoadmapValue(raw: unknown): NormalizedRoadmap | null {
+  // 1. Plain string — promote to a single-phase outline.
+  const asStr = asString(raw);
+  if (asStr) {
+    return {
+      phases: [],
+      summary: asStr,
+    };
+  }
+
+  // 2. Array form — each element is a phase.
+  if (Array.isArray(raw)) {
+    const allStrings = raw.every((x) => typeof x === "string");
+    if (allStrings) {
+      // Treat array of strings as an unsegmented checklist under a
+      // single synthetic phase so the timeline still works.
+      const tasks: NormalizedRoadmapTask[] = [];
+      for (const s of raw as string[]) {
+        const trimmed = s.trim();
+        if (!trimmed) continue;
+        tasks.push({
+          id: `phase-1-task-${tasks.length + 1}`,
+          title: trimmed,
+          description: null,
+          category: null,
+        });
+      }
+      if (tasks.length === 0) return null;
+      return {
+        phases: [
+          {
+            id: "phase-1",
+            title: "Roadmap",
+            summary: null,
+            duration: null,
+            tasks,
+            outcomes: [],
+          },
+        ],
+        summary: null,
+      };
+    }
+    const phases: NormalizedRoadmapPhase[] = [];
+    for (const entry of raw) {
+      const p = readRoadmapPhaseValue(entry, phases.length);
+      if (p) phases.push(p);
+    }
+    if (phases.length === 0) return null;
+    return { phases, summary: null };
+  }
+
+  // 3. Object form — `{ phases | milestones | timeline | items, summary }`.
+  const obj = asObject(raw);
+  if (!obj) return null;
+  const summary =
+    asString(obj.summary) ??
+    asString(obj.description) ??
+    asString(obj.overview);
+  const phaseSources = [
+    obj.phases,
+    obj.milestones,
+    obj.timeline,
+    obj.items,
+    obj.steps,
+  ];
+  let phaseList: unknown[] | null = null;
+  for (const src of phaseSources) {
+    if (Array.isArray(src) && src.length > 0) {
+      phaseList = src;
+      break;
+    }
+  }
+  if (!phaseList) {
+    if (summary) return { phases: [], summary };
+    return null;
+  }
+  const phases: NormalizedRoadmapPhase[] = [];
+  for (const entry of phaseList) {
+    const p = readRoadmapPhaseValue(entry, phases.length);
+    if (p) phases.push(p);
+  }
+  if (phases.length === 0 && !summary) return null;
+  return { phases, summary };
+}
+
+export function extractRoadmap(
+  src: Record<string, unknown>
+): NormalizedRoadmap | null {
+  for (const key of ROADMAP_KEYS) {
+    const v = src[key];
+    if (v === undefined || v === null) continue;
+    const result = readRoadmapValue(v);
+    if (result) return result;
+  }
+  return null;
+}
 
 function asFiniteNumber(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
@@ -1432,6 +1701,7 @@ export function normalizeArchitectureResult(
       techStackItems: [],
       techStackMentions: [],
       cost: null,
+      roadmap: null,
     };
   }
 
@@ -1477,6 +1747,7 @@ export function normalizeArchitectureResult(
         gatherArchitectureText(root)
       ),
       cost: findFirstTruthy(techSources, extractCost),
+      roadmap: findFirstTruthy(techSources, extractRoadmap),
     };
   }
 
@@ -1551,6 +1822,7 @@ export function normalizeArchitectureResult(
     techStackItems: findFirstNonEmpty(techSources, extractTechStackItems),
     techStackMentions: extractMentionedTechnologies(fallbackText),
     cost: findFirstTruthy(techSources, extractCost),
+    roadmap: findFirstTruthy(techSources, extractRoadmap),
   };
 }
 
